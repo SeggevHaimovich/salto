@@ -13,467 +13,450 @@
 * See the License for the specific language governing permissions and
 * limitations under the License.
 */
-import {
-  BuiltinTypes, CORE_ANNOTATIONS, ElemID, ObjectType, createRestriction, ListType, Value, ReferenceExpression,
-} from '@salto-io/adapter-api'
+import { BuiltinTypes, CORE_ANNOTATIONS, ElemID, ObjectType, createRestriction, ListType, Value, ReferenceExpression } from '@salto-io/adapter-api'
 import { createMatchingObjectType } from '@salto-io/adapter-utils'
 import { TypeAndInnerTypes } from '../../types/object_types'
 import * as constants from '../../constants'
 
+// do I need inner types to inner types? what are they here for?
+
+
 type AudienceItem = Value // TODO change
 
+export type Dependencies = {
+  dependency: string[]
+}
+
 type Audience = {
-  AudienceItems: AudienceItem[]
-  isPublic: boolean
+  AudienceItems?: AudienceItem[]
+  isPublic?: boolean
 }
 
 type BaseRecord = {
-  id: string
-  label: string
+  id?: string
+  label?: string
 }
 
-type ColumnLabel = {
-  translationScriptId: string
+type Label = {
+  translationScriptId?: string // where did I get it from?
 }
 
 type Join = Value // TODO change
 
 type JoinTrail ={
-  baseRecord: BaseRecord
-  joins: Join[]
-  label: string
-  uniqueId: string
+  baseRecord?: BaseRecord
+  joins?: Join[]
+  label?: string
+  uniqueId?: string
 }
 
 type FieldReference = {
-  id: string
-  joinTrail: JoinTrail
-  label: string
-  uniqueId: string
+  id?: string
+  joinTrail?: JoinTrail
+  label?: string
+  uniqueId?: string
 }
 
 type Column = {
-  alias: string
-  columnId: number
-  field: FieldReference
-  label: ColumnLabel
+  alias?: string
+  columnId?: number
+  field?: FieldReference
+  label?: string // check it
 }
-
+type CriteriaChildExpressionValue = {
+  type?: string
+  value?: string
+}
 type CriteriaChildExpression = {
-  label: Value
-  subType: Value
-  uiData: Value[]
-  value: {
-    type: string
-    value: number
-  }
+  label?: string
+  subType?: Value
+  uiData?: Value[]
+  value?: CriteriaChildExpressionValue
 }
+const codeList = ['AND', 'LESS', 'ANY_OF', 'EMPTY', 'OR'] as const // TODO add all the operator options instead of string
+const childCriteriaTargetFieldContextNameList = ['IDENTIFIER'] as const // TODO add all the operator options instead of string
+const criteriaTargetFieldContextNameList = ['DEFAULT'] as const // TODO add all the operator options instead of string
+const formulaDataTypeList = ['INTEGER'] as const // TODO add all the operator options instead of string
+
+type Code = typeof codeList[number]
+type childCriteriaTargetFieldContextName = typeof childCriteriaTargetFieldContextNameList[number]
+type criteriaTargetFieldContextName = typeof criteriaTargetFieldContextNameList[number]
+type formulaDataType = typeof formulaDataTypeList[number]
 
 type Operator = {
-  code: 'AND' | 'LESS' // TODO add all the operator options instead of string
+  code?: Code
+}
+
+type ChildCriteriaTargetFieldContext = {
+  name?: childCriteriaTargetFieldContextName
+}
+type CriteriaTargetFieldContext = {
+  name?: criteriaTargetFieldContextName
+}
+
+type Meta = {
+  selectorType?: Value
+  subType?: string
 }
 
 type CriteriaChild = {
-  _T_: string // 'filter'
-  caseSensitive: boolean
-  expressions: CriteriaChildExpression[]
-  field: FieldReference
-  fieldStateName: string
-  meta: {
-    selectorType: Value
-    subType: string
-  }
-  operator: Operator
-  targetFieldContext: {
-    name: string
-  }
+  // _T_: string // 'filter'
+  caseSensitive?: boolean
+  expressions?: CriteriaChildExpression[]
+  field?: FieldReference
+  fieldStateName?: string
+  meta?: Meta
+  operator?: Operator
+  targetFieldContext?: ChildCriteriaTargetFieldContext
 }
 
 type Criteria = {
-  _T_: string // 'condition'
-  children: CriteriaChild[] // is it criteria array? for some reason I dont see the same exact fields
-  field: Value
-  fieldStateName: Value
-  meta: Value
-  operator: Operator
-  targetFieldContext: {
-    name: 'DEFAULT' | 'UNCONSOLIDATED' // TODO add all the options instead of string
-  }
+  // _T_: string // 'condition'
+  children?: (CriteriaChild | Criteria)[]
+  field?: Value
+  fieldStateName?: Value
+  meta?: Value
+  operator?: Operator
+  targetFieldContext?: CriteriaTargetFieldContext
 }
 
 type Description = {
-  translationScriptId: string | ReferenceExpression
+  translationScriptId?: string | ReferenceExpression
 }
 
-type Formula = Value
+type FormulaFormula = {
+  dataType?: formulaDataType // TODO add all the operator options instead of string
+  formulaSQL?: string
+  id?: string
+  label?: Label
+  uniqueId?: string
+}
+
+type Formula = {
+  fields?: FieldReference[]
+  formula?: FormulaFormula
+}
 
 type Name = {
-  translationScriptId: string | ReferenceExpression
+  translationScriptId?: string
 }
 
-type DatasetDefinition = {
-  applicationId: Value
-  audience: Audience
-  baseRecord: BaseRecord
-  columns: Column[]
-  criteria: Criteria
-  description: Description
-  formulas: Formula[]
-  id: Value
-  name: Name
-  scriptId: Value
-  verstion: string
+type DatasetDefinitionType = {
+  applicationId?: Value
+  audience?: Audience
+  baseRecord?: BaseRecord
+  columns?: Column[]
+  criteria?: Criteria
+  description?: Description
+  formulas?: Formula[]
+  id?: Value
+  definitionName?: Name
+  definitionScriptId?: Value
+  version?: string
 }
 
-export type ReportCriteriaType = {
-  descriptor?: ReportCriteriaDescriptor
-  values?: ReportCriteriaValuesType[]
-}
-
-export type ReportParameters = {
-  ACCOUNTING_BOOK_CURRENT_ID?: string
-  ACCOUNTING_BOOK_ID?: string
-}
-
-type ReportDefinitionAccessAudience = {
-  allcustomers?: boolean
-  allemployees?: boolean
-  allpartners?: boolean
-  allroles?: boolean
-  allvendors?: boolean
-  audslctrole?: string
-}
-
-export type ParsedReportDefinition = {
-  layouts?: ReportLayout[]
-  parameters?: ReportParameters
-  components?: ReportComponent[]
-  sorts?: ReportSortType[]
-  fields?: ReportFieldsType[]
-  uiPreferences?: ReportUiPrefType
-  criteria?: ReportCriteriaType[]
-  flags?: ReportDefinitionInnerFields
-}
-
-export type ReportDefinitionType = {
+export type ParsedDataset = {
   scriptid: string
-  definition: string
-  audience?: ReportDefinitionAccessAudience
-  accessaudience?: ReportDefinitionAccessAudience
   name: string
-  dependencies?: ReportDependencies
-}
+  dependencies?: {
+    dependency?: ReferenceExpression[]
+  }
+} & DatasetDefinitionType
 
-type FullReportType = ReportDefinitionType & ParsedReportDefinition
-
-
-export const reportdefinitionType = (): TypeAndInnerTypes => {
+export const DatasetType = (): TypeAndInnerTypes => {
   const innerTypes: Record<string, ObjectType> = {}
 
-  const datasetElemID = new ElemID(constants.NETSUITE, 'dataset')
+  // ######################### Definition #########################################
+
+  const datasetApplicationIdElemID = new ElemID(constants.NETSUITE, 'dataset_applicationId') // not sure
+
+  const datasetAudienceElemID = new ElemID(constants.NETSUITE, 'dataset_audience')
+  const datasetAudience = createMatchingObjectType<Audience>({
+    elemID: datasetAudienceElemID,
+    annotations: {
+    },
+    fields: {
+      AudienceItems: { refType: new ListType(BuiltinTypes.UNKNOWN) },
+      isPublic: { refType: BuiltinTypes.BOOLEAN },
+    },
+    path: [constants.NETSUITE, constants.TYPES_PATH, datasetAudienceElemID.name],
+  })
+
   const datasetDependenciesElemID = new ElemID(constants.NETSUITE, 'dataset_dependencies')
-  const datasetColumnElemID = new ElemID(constants.NETSUITE, 'dataset_column')
-  const datasetbaseRecordElemID = new ElemID(constants.NETSUITE, 'dataset_baseRecord')
-  const datasetDescriptionElemID = new ElemID(constants.NETSUITE, 'dataset_description') // do I need it?
-  const datasetFormulaElemID = new ElemID(constants.NETSUITE, 'dataset_formula')
-  const datasetIdElemID = new ElemID(constants.NETSUITE, 'dataset_id') // do I need it?
-  const datasetNameElemID = new ElemID(constants.NETSUITE, 'dataset_name') // do I need it?
-  // const reportDefinitionElemID = new ElemID(constants.NETSUITE, 'reportdefinition')
-  // const reportDefinitionDependenciesElemID = new ElemID(constants.NETSUITE, 'reportdefinition_dependencies')
-  // const reportDefinitionComponentsElemID = new ElemID(constants.NETSUITE, 'reportdefinition_components')
-  // const reportDefinitionCriteriaElemID = new ElemID(constants.NETSUITE, 'reportdefinition_criteria')
-  // const reportCriteriaDescriptorElemID = new ElemID(constants.NETSUITE, 'reportdefinition_criteria_descriptor')
-  // const reportCriteriaValuesElemID = new ElemID(constants.NETSUITE, 'reportdefinition_criteria_values')
-  // const reportDefinitionFieldsElemID = new ElemID(constants.NETSUITE, 'reportdefinition_fields')
-  // const reportDefinitionSortsElemID = new ElemID(constants.NETSUITE, 'reportdefinition_sorts')
-  // const reportDefinitionUiPrefElemID = new ElemID(constants.NETSUITE, 'reportdefinition_uipreferences')
-  // const reportDefinitionLayoutsElemID = new ElemID(constants.NETSUITE, 'reportdefinition_layouts')
-  // const reportDefinitionParamsElemID = new ElemID(constants.NETSUITE, 'reportdefinition_parameters')
-  // const reportDefinitionFlagsElemID = new ElemID(constants.NETSUITE, 'reportdefinition_flags')
-  const reportDefinitionAudienceElemID = new ElemID(constants.NETSUITE, 'reportdefinition_audience')
-  const reportdefinitionAccessAudienceElemID = new ElemID(constants.NETSUITE, 'reportdefinition_accessaudience')
-
-  const reportDefinitionAudience = createMatchingObjectType<ReportDefinitionAccessAudience>({
-    elemID: reportDefinitionAudienceElemID,
-    annotations: {
-    },
-    fields: {
-      allcustomers: { refType: BuiltinTypes.BOOLEAN },
-      allemployees: { refType: BuiltinTypes.BOOLEAN },
-      allpartners: { refType: BuiltinTypes.BOOLEAN },
-      allroles: { refType: BuiltinTypes.BOOLEAN },
-      allvendors: { refType: BuiltinTypes.BOOLEAN },
-      audslctrole: { refType: BuiltinTypes.STRING },
-    },
-    path: [constants.NETSUITE, constants.TYPES_PATH, reportDefinitionElemID.name],
-  })
-
-  const reportDefinitionAccessAudience = createMatchingObjectType<ReportDefinitionAccessAudience>({
-    elemID: reportdefinitionAccessAudienceElemID,
-    annotations: {
-    },
-    fields: {
-      allcustomers: { refType: BuiltinTypes.BOOLEAN },
-      allemployees: { refType: BuiltinTypes.BOOLEAN },
-      allpartners: { refType: BuiltinTypes.BOOLEAN },
-      allroles: { refType: BuiltinTypes.BOOLEAN },
-      allvendors: { refType: BuiltinTypes.BOOLEAN },
-      audslctrole: { refType: BuiltinTypes.STRING },
-    },
-    path: [constants.NETSUITE, constants.TYPES_PATH, reportDefinitionElemID.name],
-  })
-
-  const reportDefinitionComponents = createMatchingObjectType<ReportComponent>({
-    elemID: reportDefinitionComponentsElemID,
-    annotations: {
-    },
-    fields: {
-      KEY_COMPONENT: { refType: BuiltinTypes.NUMBER },
-      FLAG_SECONDERY_DIM: { refType: BuiltinTypes.BOOLEAN },
-      FIELD_CLASS: { refType: BuiltinTypes.STRING },
-    },
-    path: [constants.NETSUITE, constants.TYPES_PATH, reportDefinitionElemID.name],
-  })
-
-  const reportCriteriaDescriptor = createMatchingObjectType<ReportCriteriaDescriptor>({
-    elemID: reportCriteriaDescriptorElemID,
-    annotations: {
-    },
-    fields: {
-      FIELD_ALIAS: { refType: BuiltinTypes.STRING },
-      FIELD_OP_CLASS: { refType: BuiltinTypes.STRING },
-      FILED_TYPE: { refType: BuiltinTypes.STRING },
-      SEQ_NUMBER: { refType: BuiltinTypes.NUMBER },
-      FIELD_UNIT_TYPE: { refType: BuiltinTypes.NUMBER },
-      FLAG_IN_FOOTER: { refType: BuiltinTypes.BOOLEAN },
-      FLAG_CUSTOM_FOOTER: { refType: BuiltinTypes.BOOLEAN },
-      FLAG_VIRTUAL_FIELD: { refType: BuiltinTypes.BOOLEAN },
-      FIELD_DESCRIPTOR: { refType: BuiltinTypes.STRING },
-      FLAG_IS_HIDDEN: { refType: BuiltinTypes.BOOLEAN },
-    },
-    path: [constants.NETSUITE, constants.TYPES_PATH, reportDefinitionElemID.name],
-  })
-
-  const reportCriteriaValues = createMatchingObjectType<ReportCriteriaValuesType>({
-    elemID: reportCriteriaValuesElemID,
-    annotations: {
-    },
-    fields: {
-      FIELD_DATE_FILTER_INDEX: { refType: BuiltinTypes.NUMBER },
-      SEQ_NUMBER: { refType: BuiltinTypes.NUMBER },
-      FIELD_VALUE: { refType: BuiltinTypes.UNKNOWN },
-    },
-    path: [constants.NETSUITE, constants.TYPES_PATH, reportDefinitionElemID.name],
-  })
-
-  const reportDefinitionCriteria = createMatchingObjectType<ReportCriteriaType>({
-    elemID: reportDefinitionCriteriaElemID,
-    annotations: {
-    },
-    fields: {
-      descriptor: { refType: reportCriteriaDescriptor },
-      values: { refType: new ListType(reportCriteriaValues) },
-    },
-    path: [constants.NETSUITE, constants.TYPES_PATH, reportDefinitionElemID.name],
-  })
-
-  const reportDefinitionDependencies = createMatchingObjectType<ReportDependencies>({
-    elemID: reportDefinitionDependenciesElemID,
+  const datasetDependencies = createMatchingObjectType<Dependencies>({
+    elemID: datasetDependenciesElemID,
     annotations: {
     },
     fields: {
       dependency: {
-        refType: BuiltinTypes.STRING,
+        refType: new ListType(BuiltinTypes.STRING),
         annotations: {
           _required: true,
         },
       },
     },
-    path: [constants.NETSUITE, constants.TYPES_PATH, reportDefinitionElemID.name],
+    path: [constants.NETSUITE, constants.TYPES_PATH, datasetDependenciesElemID.name],
   })
 
-  const reportDefinitionSorts = createMatchingObjectType<ReportSortType>({
-    elemID: reportDefinitionSortsElemID,
+  const datasetBaseRecordElemID = new ElemID(constants.NETSUITE, 'dataset_baseRecord')
+  const datasetBaseRecord = createMatchingObjectType<BaseRecord>({
+    elemID: datasetBaseRecordElemID,
     annotations: {
     },
     fields: {
-      KEY_COMPONENT: { refType: BuiltinTypes.STRING },
-      FIELD_TABLE: { refType: BuiltinTypes.STRING },
-      FIELD_ALIAS: { refType: BuiltinTypes.STRING },
-      FIELD_TARGET_TABLE: { refType: BuiltinTypes.STRING },
-      FIELD_FOREIGN_KEY: { refType: BuiltinTypes.STRING },
-      SEQ_NUMBER: { refType: BuiltinTypes.NUMBER },
-      FLAG_DESCENDING: { refType: BuiltinTypes.BOOLEAN },
-      FLAG_SUBTOTAL: { refType: BuiltinTypes.BOOLEAN },
+      id: { refType: BuiltinTypes.STRING },
+      label: { refType: BuiltinTypes.STRING },
     },
-    path: [constants.NETSUITE, constants.TYPES_PATH, reportDefinitionElemID.name],
+    path: [constants.NETSUITE, constants.TYPES_PATH, datasetBaseRecordElemID.name],
   })
 
-  const reportDefinitionFields = createMatchingObjectType<ReportFieldsType>({
-    elemID: reportDefinitionFieldsElemID,
+
+  const datasetJoinTrailElemID = new ElemID(constants.NETSUITE, 'dataset_joinTrail')
+  const datasetJoinTrail = createMatchingObjectType<JoinTrail>({
+    elemID: datasetJoinTrailElemID,
     annotations: {
     },
     fields: {
-      KEY_COMPONENT: { refType: BuiltinTypes.NUMBER },
-      FIELD_TABLE: { refType: BuiltinTypes.STRING },
-      FIELD_ALIAS: { refType: BuiltinTypes.STRING },
-      FIELD_TARGET_TABLE: { refType: BuiltinTypes.STRING },
-      FIELD_FOREIGN_KEY: { refType: BuiltinTypes.STRING },
-      KEY_CUSTOM_FIELD: { refType: BuiltinTypes.STRING },
-      FLAG_DIMENSION: { refType: BuiltinTypes.BOOLEAN },
-      FIELD_UNIT_TYPE: { refType: BuiltinTypes.NUMBER },
-      FLAG_ROLLUP: { refType: BuiltinTypes.BOOLEAN },
-      FIELD_DATE_FILTER_INDEX: { refType: BuiltinTypes.NUMBER },
-      FIELD_COMPARISON_TYPE: { refType: BuiltinTypes.STRING },
-      FLAG_APPLY_FORWARDING: { refType: BuiltinTypes.BOOLEAN },
-      FIELD_ALT_DATE_SEGMENT: { refType: BuiltinTypes.STRING },
-      FLAG_MEASURE: { refType: BuiltinTypes.BOOLEAN },
-      SEQ_NUMBER: { refType: BuiltinTypes.NUMBER },
-      FIELD_LABEL: { refType: BuiltinTypes.STRING },
-      FIELD_NEG_LABLE: { refType: BuiltinTypes.STRING },
-      FIELD_URL: { refType: BuiltinTypes.STRING },
-      FIELD_URL_TYPE: { refType: BuiltinTypes.STRING },
-      FLAG_DUAL_COLUMN: { refType: BuiltinTypes.BOOLEAN },
-      FLAG_PRECENT_TOTAL: { refType: BuiltinTypes.BOOLEAN },
-      FLAG_PERCENT_EXPENSE: { refType: BuiltinTypes.BOOLEAN },
-      FLAG_RUNNING_BAL: { refType: BuiltinTypes.BOOLEAN },
-      FLAG_SHOW_OPENING_BAL: { refType: BuiltinTypes.BOOLEAN },
-      FLAG_SHOW_ABS_DIFF: { refType: BuiltinTypes.BOOLEAN },
-      FLAG_SHOW_PCT_DIFF: { refType: BuiltinTypes.BOOLEAN },
-      FLAG_SUB_TOTAL: { refType: BuiltinTypes.BOOLEAN },
-      FLAG_DISPLY: { refType: BuiltinTypes.BOOLEAN },
-      FIELD_SUMMARY: { refType: BuiltinTypes.STRING },
-      FLAG_DROP_DECIMAL: { refType: BuiltinTypes.BOOLEAN },
-      FLAG_DIV_BY_THOUSAND: { refType: BuiltinTypes.BOOLEAN },
-      FLAG_NEG_IN_RED: { refType: BuiltinTypes.BOOLEAN },
-      FIELD_NEG_VAL_FORMAT: { refType: BuiltinTypes.STRING },
-      FIELD_GROUP: { refType: BuiltinTypes.STRING },
-      FIELD_PARENT_GROUP: { refType: BuiltinTypes.STRING },
-      FIELD_COLUMN_FILTER_GROUP: { refType: BuiltinTypes.STRING },
-      FIELD_FORMAT: { refType: BuiltinTypes.STRING },
-      FIELD_FORMULA: { refType: BuiltinTypes.STRING },
-      FIELD_FORMULA_BY_SEQ: { refType: BuiltinTypes.STRING },
-      FLAG_TOTAL_FORMULA: { refType: BuiltinTypes.BOOLEAN },
+      baseRecord: { refType: datasetBaseRecord },
+      joins: { refType: new ListType(BuiltinTypes.UNKNOWN) },
+      label: { refType: BuiltinTypes.STRING },
+      uniqueId: { refType: BuiltinTypes.STRING },
     },
-    path: [constants.NETSUITE, constants.TYPES_PATH, reportDefinitionElemID.name],
+    path: [constants.NETSUITE, constants.TYPES_PATH, datasetJoinTrailElemID.name],
   })
 
-  const reportDefinitionUiPref = createMatchingObjectType<ReportUiPrefType>({
-    elemID: reportDefinitionUiPrefElemID,
+  const datasetFieldReferenceElemID = new ElemID(constants.NETSUITE, 'dataset_fieldReference')
+  const datasetFieldReference = createMatchingObjectType<FieldReference>({
+    elemID: datasetFieldReferenceElemID,
     annotations: {
     },
     fields: {
-      PARAMETER_CASH_BASIS: { refType: BuiltinTypes.BOOLEAN },
-      PARAMETER_TAXCASH_BASIS: { refType: BuiltinTypes.STRING },
-      PARAMETER_SHOW_ZEROS: { refType: BuiltinTypes.BOOLEAN },
-      PARAMETER_SHOW_SINGLEROWLINES: { refType: BuiltinTypes.BOOLEAN },
-      PARAMETER_DISPLAY_TYPE: { refType: BuiltinTypes.STRING },
-      PARAMETER_INC_VS_EXP: { refType: BuiltinTypes.BOOLEAN },
-      PARAMETER_GRAPH_TOP: { refType: BuiltinTypes.NUMBER },
-      PARAMETER_WEB_STORE: { refType: BuiltinTypes.BOOLEAN },
-      PARAMETER_ACTIVITY_ONLY: { refType: BuiltinTypes.BOOLEAN },
-      PARAMETER_ALLOW_WEBQUERY: { refType: BuiltinTypes.BOOLEAN },
-      PARAMETER_GRAPH_3D: { refType: BuiltinTypes.BOOLEAN },
-      PARAMETERL_SHOW_CURRENCY_SYMBOL: { refType: BuiltinTypes.BOOLEAN },
-      PARAMETER_EXPAND_LEVEL: { refType: BuiltinTypes.NUMBER },
+      id: { refType: BuiltinTypes.STRING },
+      joinTrail: { refType: datasetJoinTrail },
+      label: { refType: BuiltinTypes.STRING },
+      uniqueId: { refType: BuiltinTypes.STRING },
     },
-    path: [constants.NETSUITE, constants.TYPES_PATH, reportDefinitionElemID.name],
+    path: [constants.NETSUITE, constants.TYPES_PATH, datasetFieldReferenceElemID.name],
   })
 
-  const reportDefinitionLayouts = createMatchingObjectType<ReportLayout>({
-    elemID: reportDefinitionLayoutsElemID,
+  const datasetColumnElemID = new ElemID(constants.NETSUITE, 'dataset_column')
+  const datasetColumn = createMatchingObjectType<Column>({
+    elemID: datasetColumnElemID,
     annotations: {
     },
     fields: {
-      FIELD_STANDARD_LAYOUT: { refType: BuiltinTypes.BOOLEAN },
-      KEY_SCRIPT_ID: { refType: BuiltinTypes.STRING },
+      alias: { refType: BuiltinTypes.STRING },
+      columnId: { refType: BuiltinTypes.NUMBER },
+      field: { refType: datasetFieldReference },
+      label: { refType: BuiltinTypes.STRING },
     },
-    path: [constants.NETSUITE, constants.TYPES_PATH, reportDefinitionElemID.name],
+    path: [constants.NETSUITE, constants.TYPES_PATH, datasetColumnElemID.name],
   })
 
-  const reportDefinitionParameters = createMatchingObjectType<ReportParameters>({
-    elemID: reportDefinitionParamsElemID,
+  const datasetDescriptionElemID = new ElemID(constants.NETSUITE, 'dataset_description') // not sure
+  const datasetDescription = createMatchingObjectType<Description>({
+    elemID: datasetDescriptionElemID,
     annotations: {
     },
     fields: {
-      ACCOUNTING_BOOK_CURRENT_ID: { refType: BuiltinTypes.STRING },
-      ACCOUNTING_BOOK_ID: { refType: BuiltinTypes.STRING },
+      translationScriptId: { refType: BuiltinTypes.STRING },
     },
-    path: [constants.NETSUITE, constants.TYPES_PATH, reportDefinitionElemID.name],
+    path: [constants.NETSUITE, constants.TYPES_PATH, datasetDescriptionElemID.name],
   })
 
-  const reportDefinitionFlags = createMatchingObjectType<ReportDefinitionInnerFields>({
-    elemID: reportDefinitionFlagsElemID,
+  const datasetLabelElemID = new ElemID(constants.NETSUITE, 'dataset_label')
+  const datasetLabel = createMatchingObjectType<Label>({
+    elemID: datasetLabelElemID,
     annotations: {
     },
     fields: {
-      KEY_REPORT_ID: { refType: BuiltinTypes.NUMBER },
-      KEY_SCRIPT_ID: { refType: BuiltinTypes.STRING },
-      KEY_PACKAGE: { refType: BuiltinTypes.STRING },
-      FIELD_KEY: { refType: BuiltinTypes.NUMBER },
-      FIELD_CODE: { refType: BuiltinTypes.STRING },
-      FIELD_DESCRIPTION: { refType: BuiltinTypes.STRING },
-      FIELD_NAME: { refType: BuiltinTypes.STRING },
-      FIELD_ORIGINAL_TITLE: { refType: BuiltinTypes.STRING },
-      FIELD_PERM_TYPE: { refType: BuiltinTypes.STRING },
-      KEY_FEATURE: { refType: BuiltinTypes.STRING },
-      FLAG_PERIODS_ALLOWD: { refType: BuiltinTypes.BOOLEAN },
-      FLAG_DISPLAY_TYPE: { refType: BuiltinTypes.STRING },
-      FLAG_ONE_DATE: { refType: BuiltinTypes.BOOLEAN },
-      FLAG_PRIMARY_OUTER_JOIN: { refType: BuiltinTypes.BOOLEAN },
-      FLAG_CUSTOM_MODE: { refType: BuiltinTypes.BOOLEAN },
-      FLAG_CASH_BASIS: { refType: BuiltinTypes.BOOLEAN },
-      FLAG_SHOW_ZEROS: { refType: BuiltinTypes.BOOLEAN },
-      FLAG_INACTIVE: { refType: BuiltinTypes.BOOLEAN },
-      FIELD_VERSION: { refType: BuiltinTypes.NUMBER },
-      FLAG_PERIODS_ON: { refType: BuiltinTypes.BOOLEAN },
-      FLAG_USE_FISCAL_YEAR_RANGE: { refType: BuiltinTypes.BOOLEAN },
-      FLAG_USE_TAX_PERIODS: { refType: BuiltinTypes.BOOLEAN },
-      KEY_ENTITY: { refType: BuiltinTypes.STRING },
-      FLAG_SHOW_LINK: { refType: BuiltinTypes.BOOLEAN },
-      FLAG_SUPPORTS_CONSOL_SUBSIDIARY: { refType: BuiltinTypes.BOOLEAN },
-      KEY_DEF_TOGGLE: { refType: BuiltinTypes.NUMBER },
-      FIELD_TOGGLE_TYPE: { refType: BuiltinTypes.STRING },
-      FIELD_TOGGLE_URL: { refType: BuiltinTypes.STRING },
-      FLAG_AFFECTED_BY_COGS: { refType: BuiltinTypes.BOOLEAN },
-      FIELD_DEPRECATION_REASON: { refType: BuiltinTypes.STRING },
-      FLAG_ACTIVITY_ONLY: { refType: BuiltinTypes.BOOLEAN },
-      KEY_AUDIENCE: { refType: BuiltinTypes.NUMBER },
-      KEY_ACCESS_AUDIENCE: { refType: BuiltinTypes.STRING },
+      translationScriptId: { refType: BuiltinTypes.STRING },
     },
-    path: [constants.NETSUITE, constants.TYPES_PATH, reportDefinitionElemID.name],
+    path: [constants.NETSUITE, constants.TYPES_PATH, datasetLabelElemID.name],
   })
 
-  innerTypes.reportDefinitionComponents = reportDefinitionComponents
-  innerTypes.reportDefinitionCriteria = reportDefinitionCriteria
-  innerTypes.reportDefinitionCriteriaDescriptor = reportCriteriaDescriptor
-  innerTypes.reportDefinitionCriteriaValues = reportCriteriaValues
-  innerTypes.reportDefinitionFlags = reportDefinitionFlags
-  innerTypes.reportdefinition_dependencies = reportDefinitionDependencies
-  innerTypes.reportDefinitionFields = reportDefinitionFields
-  innerTypes.reportDefinitionLayouts = reportDefinitionLayouts
-  innerTypes.reportDefinitionParameters = reportDefinitionParameters
-  innerTypes.reportDefinitionSorts = reportDefinitionSorts
-  innerTypes.reportDefinitionUiPref = reportDefinitionUiPref
-  innerTypes.reportdefinition_audience = reportDefinitionAudience
-  innerTypes.reportdefinition_accessaudience = reportDefinitionAccessAudience
+  const datasetFormulaFormulaElemID = new ElemID(constants.NETSUITE, 'dataset_formula_formula')
+  const datasetFormulaFormula = createMatchingObjectType<FormulaFormula>({
+    elemID: datasetFormulaFormulaElemID,
+    annotations: {
+    },
+    fields: {
+      dataType: {
+        refType: BuiltinTypes.STRING,
+        annotations: {
+          [CORE_ANNOTATIONS.RESTRICTION]: createRestriction({ values: formulaDataTypeList }),
+        },
+      },
+      formulaSQL: { refType: BuiltinTypes.STRING },
+      id: { refType: BuiltinTypes.STRING },
+      label: { refType: datasetLabel },
+      uniqueId: { refType: BuiltinTypes.STRING },
+    },
+    path: [constants.NETSUITE, constants.TYPES_PATH, datasetFormulaFormulaElemID.name],
+  })
+
+  const datasetFormulaElemID = new ElemID(constants.NETSUITE, 'dataset_formula')
+  const datasetFormula = createMatchingObjectType<Formula>({
+    elemID: datasetFormulaElemID,
+    annotations: {
+    },
+    fields: {
+      fields: { refType: new ListType(datasetFieldReference) },
+      formula: { refType: datasetFormulaFormula },
+    },
+    path: [constants.NETSUITE, constants.TYPES_PATH, datasetFormulaElemID.name],
+  })
+
+  const datasetNameElemID = new ElemID(constants.NETSUITE, 'dataset_name') // not sure
+  const datasetName = createMatchingObjectType<Name>({
+    elemID: datasetNameElemID,
+    annotations: {
+    },
+    fields: {
+      translationScriptId: { refType: BuiltinTypes.STRING },
+    },
+    path: [constants.NETSUITE, constants.TYPES_PATH, datasetNameElemID.name],
+  })
+
+  const datasetCriteriaChildExpressionValueElemID = new ElemID(constants.NETSUITE, 'dataset_criteria_child_expression_value')
+  const datasetCriteriaChildExpressionValue = createMatchingObjectType<CriteriaChildExpressionValue>({
+    elemID: datasetCriteriaChildExpressionValueElemID,
+    annotations: {
+    },
+    fields: {
+      type: { refType: BuiltinTypes.STRING },
+      value: { refType: BuiltinTypes.STRING },
+    },
+    path: [constants.NETSUITE, constants.TYPES_PATH, datasetCriteriaChildExpressionValueElemID.name],
+  })
+
+  const datasetCriteriaChildExpressionElemID = new ElemID(constants.NETSUITE, 'dataset_criteria_child_expression')
+  const datasetCriteriaChildExpression = createMatchingObjectType<CriteriaChildExpression>({
+    elemID: datasetCriteriaChildExpressionElemID,
+    annotations: {
+    },
+    fields: {
+      label: { refType: BuiltinTypes.STRING },
+      subType: { refType: BuiltinTypes.UNKNOWN },
+      uiData: { refType: new ListType(BuiltinTypes.STRING) },
+      value: { refType: datasetCriteriaChildExpressionValue },
+    },
+    path: [constants.NETSUITE, constants.TYPES_PATH, datasetCriteriaChildExpressionElemID.name],
+  })
+
+  const datasetMetaElemID = new ElemID(constants.NETSUITE, 'dataset_meta')
+  const datasetMeta = createMatchingObjectType<Meta>({
+    elemID: datasetMetaElemID,
+    annotations: {
+    },
+    fields: {
+      selectorType: { refType: BuiltinTypes.UNKNOWN },
+      subType: { refType: BuiltinTypes.STRING },
+    },
+    path: [constants.NETSUITE, constants.TYPES_PATH, datasetMetaElemID.name],
+  })
+
+  const datasetOperatorElemID = new ElemID(constants.NETSUITE, 'dataset_operator')
+  const datasetOperator = createMatchingObjectType<Operator>({
+    elemID: datasetMetaElemID,
+    annotations: {
+    },
+    fields: {
+      code: {
+        refType: BuiltinTypes.STRING,
+        annotations: {
+          [CORE_ANNOTATIONS.RESTRICTION]: createRestriction({ values: codeList }),
+        },
+      },
+    },
+    path: [constants.NETSUITE, constants.TYPES_PATH, datasetOperatorElemID.name],
+  })
+
+  const datasetChildTargetFieldContextElemID = new ElemID(constants.NETSUITE, 'dataset__criteria_child_TargetFieldContext')
+  const datasetChildTargetFieldContext = createMatchingObjectType<ChildCriteriaTargetFieldContext>({
+    elemID: datasetChildTargetFieldContextElemID,
+    annotations: {
+    },
+    fields: {
+      name: {
+        refType: BuiltinTypes.STRING,
+        annotations: {
+          [CORE_ANNOTATIONS.RESTRICTION]: createRestriction({ values: childCriteriaTargetFieldContextNameList }),
+        },
+      },
+    },
+    path: [constants.NETSUITE, constants.TYPES_PATH, datasetChildTargetFieldContextElemID.name],
+  })
+
+  const datasetCriteriaChildElemID = new ElemID(constants.NETSUITE, 'dataset_criteria_child')
+  const datasetCriteriaChild = createMatchingObjectType<CriteriaChild>({
+    elemID: datasetCriteriaChildElemID,
+    annotations: {
+    },
+    fields: {
+      caseSensitive: { refType: BuiltinTypes.BOOLEAN },
+      expressions: { refType: new ListType(datasetCriteriaChildExpression) },
+      field: { refType: datasetFieldReference },
+      fieldStateName: { refType: BuiltinTypes.STRING },
+      meta: { refType: datasetMeta },
+      operator: { refType: datasetOperator },
+      targetFieldContext: { refType: datasetChildTargetFieldContext },
+    },
+    path: [constants.NETSUITE, constants.TYPES_PATH, datasetCriteriaChildElemID.name],
+  })
+
+  const datasetTargetFieldContextElemID = new ElemID(constants.NETSUITE, 'dataset_criteria_TargetFieldContext')
+  const datasetTargetFieldContext = createMatchingObjectType<CriteriaTargetFieldContext>({
+    elemID: datasetChildTargetFieldContextElemID,
+    annotations: {
+    },
+    fields: {
+      name: {
+        refType: BuiltinTypes.STRING,
+        annotations: {
+          [CORE_ANNOTATIONS.RESTRICTION]: createRestriction({ values: criteriaTargetFieldContextNameList }),
+        },
+      }, // dont know how to do it
+    },
+    path: [constants.NETSUITE, constants.TYPES_PATH, datasetTargetFieldContextElemID.name],
+  })
+
+  const datasetCriteriaElemID = new ElemID(constants.NETSUITE, 'dataset_criteria')
+  const datasetCriteria = createMatchingObjectType<Criteria>({
+    elemID: datasetCriteriaElemID,
+    annotations: {
+    },
+    fields: {
+      children: { refType: new ListType(datasetCriteriaElemID | datasetCriteriaChild) }, // don't know how to do
+      field: { refType: BuiltinTypes.UNKNOWN },
+      fieldStateName: { refType: BuiltinTypes.UNKNOWN },
+      meta: { refType: BuiltinTypes.UNKNOWN },
+      operator: { refType: datasetOperator },
+      targetFieldContext: { refType: datasetTargetFieldContext },
+    },
+    path: [constants.NETSUITE, constants.TYPES_PATH, datasetCriteriaElemID.name],
+  })
+
+  const datasetDefinitionIdElemID = new ElemID(constants.NETSUITE, 'dataset_Definition_id') // not sure
 
 
-  const reportdefinition = createMatchingObjectType<FullReportType>({
-    elemID: reportDefinitionElemID,
+  innerTypes.applicationId = datasetApplicationId // not sure
+  innerTypes.audience = datasetAudience
+  innerTypes.baseRecord = datasetBaseRecord
+  innerTypes.criteria = datasetCriteria
+  innerTypes.description = datasetDescription
+  innerTypes.name = datasetName
+
+  const datasetElemID = new ElemID(constants.NETSUITE, 'dataset')
+  const reportdefinition = createMatchingObjectType<ParsedDataset>({
+    elemID: datasetElemID,
     fields: {
       scriptid: {
         refType: BuiltinTypes.SERVICE_ID,
         annotations: {
           _required: true,
           [constants.IS_ATTRIBUTE]: true,
-          [CORE_ANNOTATIONS.RESTRICTION]: createRestriction({ regex: '^customreport[0-9a-z_]+' }),
-        },
-      },
-      definition: {
-        refType: BuiltinTypes.STRING,
-        annotations: {
-          _required: true,
+          [CORE_ANNOTATIONS.RESTRICTION]: createRestriction({ regex: '^custdataset[0-9a-z_]+' }),
         },
       },
       name: {
@@ -483,43 +466,45 @@ export const reportdefinitionType = (): TypeAndInnerTypes => {
         },
       },
       dependencies: {
-        refType: reportDefinitionDependencies,
+        refType: datasetDependencies,
+      },
+      applicationId: {
+        refType: BuiltinTypes.UNKNOWN,
       },
       audience: {
-        refType: reportDefinitionAudience,
+        refType: datasetAudience,
       },
-      accessaudience: {
-        refType: reportDefinitionAccessAudience,
+      baseRecord: {
+        refType: datasetBaseRecord,
       },
-      layouts: {
-        refType: new ListType(reportDefinitionLayouts),
-      },
-      parameters: {
-        refType: reportDefinitionParameters,
-      },
-      components: {
-        refType: new ListType(reportDefinitionComponents),
+      columns: {
+        refType: new ListType(datasetColumn),
       },
       criteria: {
-        refType: new ListType(reportDefinitionCriteria),
+        refType: datasetCriteria,
       },
-      fields: {
-        refType: new ListType(reportDefinitionFields),
+      description: {
+        refType: datasetDescription,
       },
-      sorts: {
-        refType: new ListType(reportDefinitionSorts),
+      formulas: {
+        refType: new ListType(datasetFormula),
       },
-      uiPreferences: {
-        refType: reportDefinitionUiPref,
+      id: {
+        refType: BuiltinTypes.UNKNOWN,
       },
-      flags: {
-        refType: reportDefinitionFlags,
+      definitionName: {
+        refType: datasetName,
+      },
+      definitionScriptId: {
+        refType: BuiltinTypes.UNKNOWN,
+      },
+      version: {
+        refType: BuiltinTypes.STRING,
       },
     },
     annotations: {
     },
-    path: [constants.NETSUITE, constants.TYPES_PATH, reportDefinitionElemID.name],
+    path: [constants.NETSUITE, constants.TYPES_PATH, datasetElemID.name],
   })
-
   return { type: reportdefinition, innerTypes }
 }
