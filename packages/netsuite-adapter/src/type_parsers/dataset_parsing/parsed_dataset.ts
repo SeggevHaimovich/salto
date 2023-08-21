@@ -21,7 +21,15 @@ import * as constants from '../../constants'
 // do I need inner types to inner types? what are they here for?
 
 
-type AudienceItem = Value // TODO change
+type AudienceItem = Value
+type FieldReferenceJoinTrailJoin = Value
+type CriteriaExpressionSubType = Value
+type CriteriaExpressionUiData = Value
+type MetaSelectorType = Value
+type ApplicationId = Value
+type DefinitionId = Value
+type DefinitionScriptId = Value
+
 
 export type Dependencies = {
   dependency: string[]
@@ -41,11 +49,9 @@ type Label = {
   translationScriptId?: string // where did I get it from?
 }
 
-type Join = Value // TODO change
-
 type JoinTrail ={
   baseRecord?: BaseRecord
-  joins?: Join[]
+  joins?: FieldReferenceJoinTrailJoin[]
   label?: string
   uniqueId?: string
 }
@@ -67,18 +73,22 @@ type CriteriaChildExpressionValue = {
   type?: string
   value?: string
 }
-type CriteriaChildExpression = {
+type CriteriaExpression = {
   label?: string
-  subType?: Value
-  uiData?: Value[]
+  subType?: CriteriaExpressionSubType
+  uiData?: CriteriaExpressionUiData[]
   value?: CriteriaChildExpressionValue
 }
 
 // TODO add all the options to all
-const codeList = ['AND', 'LESS', 'ANY_OF', 'EMPTY', 'OR'] as const
+const codeList = ['AND', 'OR',
+  'ANY_OF',
+  'EMPTY', 'EMPTY_NOT', 'CONTAIN', 'CONTAIN_NOT', 'ENDWITH', 'ENDWITH_NOT', 'IS', 'IS_NOT', 'START_WITH', 'START_WITH_NOT',
+  'LESS', 'GREATER', 'EQUAL', 'EQUAL_NOT', 'GREATER_OR_EQUAL', 'LESS_OR_EQUAL', 'BETWEEN', 'BETWEEN_NOT'] as const
 const criteriaTargetFieldContextNameList = ['DEFAULT', 'IDENTIFIER'] as const
-const formulaDataTypeList = ['INTEGER'] as const
+const formulaDataTypeList = ['INTEGER', 'BOOLEAN', 'DATE', 'DATETIME', 'FLOAT', 'STRING', 'CLOBTEXT', 'PERCENT', 'DURATION'] as const
 
+// should I just use string?
 type Code = typeof codeList[number]
 type criteriaTargetFieldContextName = typeof criteriaTargetFieldContextNameList[number]
 type formulaDataType = typeof formulaDataTypeList[number]
@@ -92,7 +102,7 @@ type CriteriaTargetFieldContext = {
 }
 
 type Meta = {
-  selectorType?: Value
+  selectorType?: MetaSelectorType
   subType?: string
 }
 
@@ -100,10 +110,10 @@ type Criteria = {
   // _T_: string // 'condition'
   children?: Criteria[]
   caseSensitive?: boolean
-  expressions?: CriteriaChildExpression[]
-  field?: Value
-  fieldStateName?: Value
-  meta?: Value
+  expressions?: CriteriaExpression[]
+  field?: FieldReference
+  fieldStateName?: string
+  meta?: Meta
   operator?: Operator
   targetFieldContext?: CriteriaTargetFieldContext
 }
@@ -113,7 +123,7 @@ type Description = {
 }
 
 type FormulaFormula = {
-  dataType?: formulaDataType // TODO add all the operator options instead of string
+  dataType?: formulaDataType
   formulaSQL?: string
   id?: string
   label?: Label
@@ -130,16 +140,16 @@ type Name = {
 }
 
 type DatasetDefinitionType = {
-  applicationId?: Value
+  applicationId?: ApplicationId
   audience?: Audience
   baseRecord?: BaseRecord
   columns?: Column[]
   criteria?: Criteria
   description?: Description
   formulas?: Formula[]
-  id?: Value
+  id?: DefinitionId
   definitionName?: Name
-  definitionScriptId?: Value
+  definitionScriptId?: DefinitionScriptId
   version?: string
 }
 
@@ -319,7 +329,7 @@ export const DatasetType = (): TypeAndInnerTypes => {
   })
 
   const datasetCriteriaChildExpressionElemID = new ElemID(constants.NETSUITE, 'dataset_criteria_expression')
-  const datasetCriteriaChildExpression = createMatchingObjectType<CriteriaChildExpression>({
+  const datasetCriteriaChildExpression = createMatchingObjectType<CriteriaExpression>({
     elemID: datasetCriteriaChildExpressionElemID,
     annotations: {
     },
