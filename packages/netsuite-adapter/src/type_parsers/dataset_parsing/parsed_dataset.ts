@@ -13,7 +13,7 @@
 * See the License for the specific language governing permissions and
 * limitations under the License.
 */
-import { BuiltinTypes, CORE_ANNOTATIONS, ElemID, ObjectType, createRestriction, ListType, Value, ReferenceExpression } from '@salto-io/adapter-api'
+import { BuiltinTypes, CORE_ANNOTATIONS, ElemID, ObjectType, createRestriction, ListType, Value, ReferenceExpression, createRefToElmWithValue } from '@salto-io/adapter-api'
 import { createMatchingObjectType } from '@salto-io/adapter-utils'
 import { TypeAndInnerTypes } from '../../types/object_types'
 import * as constants from '../../constants'
@@ -73,13 +73,13 @@ type CriteriaChildExpression = {
   uiData?: Value[]
   value?: CriteriaChildExpressionValue
 }
-const codeList = ['AND', 'LESS', 'ANY_OF', 'EMPTY', 'OR'] as const // TODO add all the operator options instead of string
-const childCriteriaTargetFieldContextNameList = ['IDENTIFIER'] as const // TODO add all the operator options instead of string
-const criteriaTargetFieldContextNameList = ['DEFAULT'] as const // TODO add all the operator options instead of string
-const formulaDataTypeList = ['INTEGER'] as const // TODO add all the operator options instead of string
+
+// TODO add all the options to all
+const codeList = ['AND', 'LESS', 'ANY_OF', 'EMPTY', 'OR'] as const
+const criteriaTargetFieldContextNameList = ['DEFAULT', 'IDENTIFIER'] as const
+const formulaDataTypeList = ['INTEGER'] as const
 
 type Code = typeof codeList[number]
-type childCriteriaTargetFieldContextName = typeof childCriteriaTargetFieldContextNameList[number]
 type criteriaTargetFieldContextName = typeof criteriaTargetFieldContextNameList[number]
 type formulaDataType = typeof formulaDataTypeList[number]
 
@@ -87,9 +87,6 @@ type Operator = {
   code?: Code
 }
 
-type ChildCriteriaTargetFieldContext = {
-  name?: childCriteriaTargetFieldContextName
-}
 type CriteriaTargetFieldContext = {
   name?: criteriaTargetFieldContextName
 }
@@ -99,20 +96,11 @@ type Meta = {
   subType?: string
 }
 
-type CriteriaChild = {
-  // _T_: string // 'filter'
-  caseSensitive?: boolean
-  expressions?: CriteriaChildExpression[]
-  field?: FieldReference
-  fieldStateName?: string
-  meta?: Meta
-  operator?: Operator
-  targetFieldContext?: ChildCriteriaTargetFieldContext
-}
-
 type Criteria = {
   // _T_: string // 'condition'
-  children?: (CriteriaChild | Criteria)[]
+  children?: Criteria[]
+  caseSensitive?: boolean
+  expressions?: CriteriaChildExpression[]
   field?: Value
   fieldStateName?: Value
   meta?: Value
@@ -168,7 +156,7 @@ export const DatasetType = (): TypeAndInnerTypes => {
 
   // ######################### Definition #########################################
 
-  const datasetApplicationIdElemID = new ElemID(constants.NETSUITE, 'dataset_applicationId') // not sure
+  // const datasetApplicationIdElemID = new ElemID(constants.NETSUITE, 'dataset_applicationId') // not sure if needed
 
   const datasetAudienceElemID = new ElemID(constants.NETSUITE, 'dataset_audience')
   const datasetAudience = createMatchingObjectType<Audience>({
@@ -318,19 +306,19 @@ export const DatasetType = (): TypeAndInnerTypes => {
     path: [constants.NETSUITE, constants.TYPES_PATH, datasetNameElemID.name],
   })
 
-  const datasetCriteriaChildExpressionValueElemID = new ElemID(constants.NETSUITE, 'dataset_criteria_child_expression_value')
-  const datasetCriteriaChildExpressionValue = createMatchingObjectType<CriteriaChildExpressionValue>({
-    elemID: datasetCriteriaChildExpressionValueElemID,
+  const datasetCriteriaExpressionValueElemID = new ElemID(constants.NETSUITE, 'dataset_criteria_expression_value')
+  const datasetCriteriaExpressionValue = createMatchingObjectType<CriteriaChildExpressionValue>({
+    elemID: datasetCriteriaExpressionValueElemID,
     annotations: {
     },
     fields: {
       type: { refType: BuiltinTypes.STRING },
       value: { refType: BuiltinTypes.STRING },
     },
-    path: [constants.NETSUITE, constants.TYPES_PATH, datasetCriteriaChildExpressionValueElemID.name],
+    path: [constants.NETSUITE, constants.TYPES_PATH, datasetCriteriaExpressionValueElemID.name],
   })
 
-  const datasetCriteriaChildExpressionElemID = new ElemID(constants.NETSUITE, 'dataset_criteria_child_expression')
+  const datasetCriteriaChildExpressionElemID = new ElemID(constants.NETSUITE, 'dataset_criteria_expression')
   const datasetCriteriaChildExpression = createMatchingObjectType<CriteriaChildExpression>({
     elemID: datasetCriteriaChildExpressionElemID,
     annotations: {
@@ -339,7 +327,7 @@ export const DatasetType = (): TypeAndInnerTypes => {
       label: { refType: BuiltinTypes.STRING },
       subType: { refType: BuiltinTypes.UNKNOWN },
       uiData: { refType: new ListType(BuiltinTypes.STRING) },
-      value: { refType: datasetCriteriaChildExpressionValue },
+      value: { refType: datasetCriteriaExpressionValue },
     },
     path: [constants.NETSUITE, constants.TYPES_PATH, datasetCriteriaChildExpressionElemID.name],
   })
@@ -372,42 +360,9 @@ export const DatasetType = (): TypeAndInnerTypes => {
     path: [constants.NETSUITE, constants.TYPES_PATH, datasetOperatorElemID.name],
   })
 
-  const datasetChildTargetFieldContextElemID = new ElemID(constants.NETSUITE, 'dataset__criteria_child_TargetFieldContext')
-  const datasetChildTargetFieldContext = createMatchingObjectType<ChildCriteriaTargetFieldContext>({
-    elemID: datasetChildTargetFieldContextElemID,
-    annotations: {
-    },
-    fields: {
-      name: {
-        refType: BuiltinTypes.STRING,
-        annotations: {
-          [CORE_ANNOTATIONS.RESTRICTION]: createRestriction({ values: childCriteriaTargetFieldContextNameList }),
-        },
-      },
-    },
-    path: [constants.NETSUITE, constants.TYPES_PATH, datasetChildTargetFieldContextElemID.name],
-  })
-
-  const datasetCriteriaChildElemID = new ElemID(constants.NETSUITE, 'dataset_criteria_child')
-  const datasetCriteriaChild = createMatchingObjectType<CriteriaChild>({
-    elemID: datasetCriteriaChildElemID,
-    annotations: {
-    },
-    fields: {
-      caseSensitive: { refType: BuiltinTypes.BOOLEAN },
-      expressions: { refType: new ListType(datasetCriteriaChildExpression) },
-      field: { refType: datasetFieldReference },
-      fieldStateName: { refType: BuiltinTypes.STRING },
-      meta: { refType: datasetMeta },
-      operator: { refType: datasetOperator },
-      targetFieldContext: { refType: datasetChildTargetFieldContext },
-    },
-    path: [constants.NETSUITE, constants.TYPES_PATH, datasetCriteriaChildElemID.name],
-  })
-
   const datasetTargetFieldContextElemID = new ElemID(constants.NETSUITE, 'dataset_criteria_TargetFieldContext')
   const datasetTargetFieldContext = createMatchingObjectType<CriteriaTargetFieldContext>({
-    elemID: datasetChildTargetFieldContextElemID,
+    elemID: datasetTargetFieldContextElemID,
     annotations: {
     },
     fields: {
@@ -427,20 +382,20 @@ export const DatasetType = (): TypeAndInnerTypes => {
     annotations: {
     },
     fields: {
-      children: { refType: new ListType(datasetCriteriaElemID | datasetCriteriaChild) }, // don't know how to do
-      field: { refType: BuiltinTypes.UNKNOWN },
-      fieldStateName: { refType: BuiltinTypes.UNKNOWN },
-      meta: { refType: BuiltinTypes.UNKNOWN },
+      children: { refType: BuiltinTypes.UNKNOWN }, // don't know how to do without value
+      caseSensitive: { refType: BuiltinTypes.BOOLEAN },
+      expressions: { refType: new ListType(datasetCriteriaChildExpression) },
       operator: { refType: datasetOperator },
       targetFieldContext: { refType: datasetTargetFieldContext },
+      field: { refType: datasetFieldReference },
+      fieldStateName: { refType: BuiltinTypes.STRING },
+      meta: { refType: datasetMeta },
     },
     path: [constants.NETSUITE, constants.TYPES_PATH, datasetCriteriaElemID.name],
   })
+  datasetCriteria.fields.children.refType = createRefToElmWithValue(new ListType(datasetCriteria))
 
-  const datasetDefinitionIdElemID = new ElemID(constants.NETSUITE, 'dataset_Definition_id') // not sure
-
-
-  innerTypes.applicationId = datasetApplicationId // not sure
+  // innerTypes.applicationId = datasetApplicationId // not sure if needed
   innerTypes.audience = datasetAudience
   innerTypes.baseRecord = datasetBaseRecord
   innerTypes.criteria = datasetCriteria
