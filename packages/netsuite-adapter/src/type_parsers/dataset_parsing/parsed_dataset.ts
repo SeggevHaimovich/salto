@@ -13,19 +13,24 @@
 * See the License for the specific language governing permissions and
 * limitations under the License.
 */
-import { BuiltinTypes, CORE_ANNOTATIONS, ElemID, ObjectType, createRestriction, ListType, Value, ReferenceExpression, createRefToElmWithValue } from '@salto-io/adapter-api'
+import { BuiltinTypes, CORE_ANNOTATIONS, ElemID, ObjectType, createRestriction, ListType, Value, createRefToElmWithValue } from '@salto-io/adapter-api'
 import { createMatchingObjectType } from '@salto-io/adapter-utils'
 import { TypeAndInnerTypes } from '../../types/object_types'
 import * as constants from '../../constants'
 
 // do I need inner types to inner types? what are they here for?
+// how to do references (dependencies)
+// can deploy without all the fields under definition
+
+// can't deploy ownerId - do strange thing (change and stay after fetch, doesn't change the owner in the UI)
 
 
 type AudienceItem = Value
 type FieldReferenceJoinTrailJoin = Value
 type CriteriaExpressionSubType = Value
 type CriteriaExpressionUiData = Value
-type MetaSelectorType = Value
+
+// we should ignore these values
 type ApplicationId = Value
 type DefinitionId = Value
 type DefinitionScriptId = Value
@@ -102,7 +107,7 @@ type CriteriaTargetFieldContext = {
 }
 
 type Meta = {
-  selectorType?: MetaSelectorType
+  selectorType?: string
   subType?: string
 }
 
@@ -119,7 +124,7 @@ type Criteria = {
 }
 
 type Description = {
-  translationScriptId?: string | ReferenceExpression
+  translationScriptId?: string
 }
 
 type FormulaFormula = {
@@ -157,264 +162,282 @@ export type ParsedDataset = {
   scriptid: string
   name: string
   dependencies?: {
-    dependency?: ReferenceExpression[]
+    dependency?: string[]
   }
 } & DatasetDefinitionType
+
+const datasetAudienceElemID = (): ElemID => new ElemID(constants.NETSUITE, 'dataset_audience')
+const datasetAudience = (): ObjectType => createMatchingObjectType<Audience>({
+  elemID: datasetAudienceElemID(),
+  annotations: {
+  },
+  fields: {
+    AudienceItems: { refType: new ListType(BuiltinTypes.UNKNOWN) },
+    isPublic: { refType: BuiltinTypes.BOOLEAN },
+  },
+  path: [constants.NETSUITE, constants.TYPES_PATH, datasetAudienceElemID().name],
+})
+
+
+const datasetDependenciesElemID = (): ElemID => new ElemID(constants.NETSUITE, 'dataset_dependencies')
+const datasetDependencies = (): ObjectType => createMatchingObjectType<Dependencies>({
+  elemID: datasetDependenciesElemID(),
+  annotations: {
+  },
+  fields: {
+    dependency: {
+      refType: new ListType(BuiltinTypes.STRING),
+      annotations: {
+        _required: true,
+      },
+    },
+  },
+  path: [constants.NETSUITE, constants.TYPES_PATH, datasetDependenciesElemID().name],
+})
+
+const datasetBaseRecordElemID = (): ElemID => new ElemID(constants.NETSUITE, 'dataset_baseRecord')
+const datasetBaseRecord = (): ObjectType => createMatchingObjectType<BaseRecord>({
+  elemID: datasetBaseRecordElemID(),
+  annotations: {
+  },
+  fields: {
+    id: { refType: BuiltinTypes.STRING },
+    label: { refType: BuiltinTypes.STRING },
+  },
+  path: [constants.NETSUITE, constants.TYPES_PATH, datasetBaseRecordElemID().name],
+})
+
+
+const datasetJoinTrailElemID = (): ElemID => new ElemID(constants.NETSUITE, 'dataset_joinTrail')
+const datasetJoinTrail = (): ObjectType => createMatchingObjectType<JoinTrail>({
+  elemID: datasetJoinTrailElemID(),
+  annotations: {
+  },
+  fields: {
+    baseRecord: { refType: datasetBaseRecord() },
+    joins: { refType: new ListType(BuiltinTypes.UNKNOWN) },
+    label: { refType: BuiltinTypes.STRING },
+    uniqueId: { refType: BuiltinTypes.STRING },
+  },
+  path: [constants.NETSUITE, constants.TYPES_PATH, datasetJoinTrailElemID().name],
+})
+
+const datasetFieldReferenceElemID = (): ElemID => new ElemID(constants.NETSUITE, 'dataset_fieldReference')
+const datasetFieldReference = (): ObjectType => createMatchingObjectType<FieldReference>({
+  elemID: datasetFieldReferenceElemID(),
+  annotations: {
+  },
+  fields: {
+    id: { refType: BuiltinTypes.STRING },
+    joinTrail: { refType: datasetJoinTrail() },
+    label: { refType: BuiltinTypes.STRING },
+    uniqueId: { refType: BuiltinTypes.STRING },
+  },
+  path: [constants.NETSUITE, constants.TYPES_PATH, datasetFieldReferenceElemID().name],
+})
+
+const datasetColumnElemID = (): ElemID => new ElemID(constants.NETSUITE, 'dataset_column')
+const datasetColumn = (): ObjectType => createMatchingObjectType<Column>({
+  elemID: datasetColumnElemID(),
+  annotations: {
+  },
+  fields: {
+    alias: { refType: BuiltinTypes.STRING },
+    columnId: { refType: BuiltinTypes.NUMBER },
+    field: { refType: datasetFieldReference() },
+    label: { refType: BuiltinTypes.STRING },
+  },
+  path: [constants.NETSUITE, constants.TYPES_PATH, datasetColumnElemID().name],
+})
+
+const datasetDescriptionElemID = (): ElemID => new ElemID(constants.NETSUITE, 'dataset_description') // not sure
+const datasetDescription = (): ObjectType => createMatchingObjectType<Description>({
+  elemID: datasetDescriptionElemID(),
+  annotations: {
+  },
+  fields: {
+    translationScriptId: { refType: BuiltinTypes.STRING },
+  },
+  path: [constants.NETSUITE, constants.TYPES_PATH, datasetDescriptionElemID().name],
+})
+
+const datasetLabelElemID = (): ElemID => new ElemID(constants.NETSUITE, 'dataset_label')
+const datasetLabel = (): ObjectType => createMatchingObjectType<Label>({
+  elemID: datasetLabelElemID(),
+  annotations: {
+  },
+  fields: {
+    translationScriptId: { refType: BuiltinTypes.STRING },
+  },
+  path: [constants.NETSUITE, constants.TYPES_PATH, datasetLabelElemID().name],
+})
+
+const datasetFormulaFormulaElemID = (): ElemID => new ElemID(constants.NETSUITE, 'dataset_formula_formula')
+const datasetFormulaFormula = (): ObjectType => createMatchingObjectType<FormulaFormula>({
+  elemID: datasetFormulaFormulaElemID(),
+  annotations: {
+  },
+  fields: {
+    dataType: {
+      refType: BuiltinTypes.STRING,
+      annotations: {
+        [CORE_ANNOTATIONS.RESTRICTION]: createRestriction({ values: formulaDataTypeList }),
+      },
+    },
+    formulaSQL: { refType: BuiltinTypes.STRING },
+    id: { refType: BuiltinTypes.STRING },
+    label: { refType: datasetLabel() },
+    uniqueId: { refType: BuiltinTypes.STRING },
+  },
+  path: [constants.NETSUITE, constants.TYPES_PATH, datasetFormulaFormulaElemID().name],
+})
+
+const datasetFormulaElemID = (): ElemID => new ElemID(constants.NETSUITE, 'dataset_formula')
+const datasetFormula = (): ObjectType => createMatchingObjectType<Formula>({
+  elemID: datasetFormulaElemID(),
+  annotations: {
+  },
+  fields: {
+    fields: { refType: new ListType(datasetFieldReference()) },
+    formula: { refType: datasetFormulaFormula() },
+  },
+  path: [constants.NETSUITE, constants.TYPES_PATH, datasetFormulaElemID().name],
+})
+
+const datasetNameElemID = (): ElemID => new ElemID(constants.NETSUITE, 'dataset_name') // not sure
+const datasetName = (): ObjectType => createMatchingObjectType<Name>({
+  elemID: datasetNameElemID(),
+  annotations: {
+  },
+  fields: {
+    translationScriptId: { refType: BuiltinTypes.STRING },
+  },
+  path: [constants.NETSUITE, constants.TYPES_PATH, datasetNameElemID().name],
+})
+
+const datasetCriteriaExpressionValueElemID = (): ElemID => new ElemID(constants.NETSUITE, 'dataset_criteria_expression_value')
+const datasetCriteriaExpressionValue = (): ObjectType => createMatchingObjectType<CriteriaChildExpressionValue>({
+  elemID: datasetCriteriaExpressionValueElemID(),
+  annotations: {
+  },
+  fields: {
+    type: { refType: BuiltinTypes.STRING },
+    value: { refType: BuiltinTypes.STRING },
+  },
+  path: [constants.NETSUITE, constants.TYPES_PATH, datasetCriteriaExpressionValueElemID().name],
+})
+
+const datasetCriteriaChildExpressionElemID = (): ElemID => new ElemID(constants.NETSUITE, 'dataset_criteria_expression')
+const datasetCriteriaChildExpression = (): ObjectType => createMatchingObjectType<CriteriaExpression>({
+  elemID: datasetCriteriaChildExpressionElemID(),
+  annotations: {
+  },
+  fields: {
+    label: { refType: BuiltinTypes.STRING },
+    subType: { refType: BuiltinTypes.UNKNOWN },
+    uiData: { refType: new ListType(BuiltinTypes.STRING) },
+    value: { refType: datasetCriteriaExpressionValue() },
+  },
+  path: [constants.NETSUITE, constants.TYPES_PATH, datasetCriteriaChildExpressionElemID().name],
+})
+
+const datasetMetaElemID = (): ElemID => new ElemID(constants.NETSUITE, 'dataset_meta')
+const datasetMeta = (): ObjectType => createMatchingObjectType<Meta>({
+  elemID: datasetMetaElemID(),
+  annotations: {
+  },
+  fields: {
+    selectorType: { refType: BuiltinTypes.UNKNOWN },
+    subType: { refType: BuiltinTypes.STRING },
+  },
+  path: [constants.NETSUITE, constants.TYPES_PATH, datasetMetaElemID().name],
+})
+
+const datasetOperatorElemID = (): ElemID => new ElemID(constants.NETSUITE, 'dataset_operator')
+const datasetOperator = (): ObjectType => createMatchingObjectType<Operator>({
+  elemID: datasetMetaElemID(),
+  annotations: {
+  },
+  fields: {
+    code: {
+      refType: BuiltinTypes.STRING,
+      annotations: {
+        [CORE_ANNOTATIONS.RESTRICTION]: createRestriction({ values: codeList }),
+      },
+    },
+  },
+  path: [constants.NETSUITE, constants.TYPES_PATH, datasetOperatorElemID().name],
+})
+
+const datasetTargetFieldContextElemID = (): ElemID => new ElemID(constants.NETSUITE, 'dataset_criteria_TargetFieldContext')
+const datasetTargetFieldContext = (): ObjectType => createMatchingObjectType<CriteriaTargetFieldContext>({
+  elemID: datasetTargetFieldContextElemID(),
+  annotations: {
+  },
+  fields: {
+    name: {
+      refType: BuiltinTypes.STRING,
+      annotations: {
+        [CORE_ANNOTATIONS.RESTRICTION]: createRestriction({ values: criteriaTargetFieldContextNameList }),
+      },
+    }, // dont know how to do it
+  },
+  path: [constants.NETSUITE, constants.TYPES_PATH, datasetTargetFieldContextElemID().name],
+})
+
+const datasetCriteriaElemID = (): ElemID => new ElemID(constants.NETSUITE, 'dataset_criteria')
+const datasetCriteria = (): ObjectType => createMatchingObjectType<Criteria>({
+  elemID: datasetCriteriaElemID(),
+  annotations: {
+  },
+  fields: {
+    children: { refType: BuiltinTypes.UNKNOWN }, // don't know how to do without value
+    caseSensitive: { refType: BuiltinTypes.BOOLEAN },
+    expressions: { refType: new ListType(datasetCriteriaChildExpression()) },
+    operator: { refType: datasetOperator() },
+    targetFieldContext: { refType: datasetTargetFieldContext() },
+    field: { refType: datasetFieldReference() },
+    fieldStateName: { refType: BuiltinTypes.STRING },
+    meta: { refType: datasetMeta() },
+  },
+  path: [constants.NETSUITE, constants.TYPES_PATH, datasetCriteriaElemID().name],
+})
+datasetCriteria().fields.children.refType = createRefToElmWithValue(new ListType(datasetCriteria()))
+
+const datasetDefinitionElemID = (): ElemID => new ElemID(constants.NETSUITE, 'dataset_definition')
+export const datasetDefinition = (): ObjectType => createMatchingObjectType<DatasetDefinitionType>({
+  elemID: datasetDefinitionElemID(),
+  annotations: {
+  },
+  fields: {
+    applicationId: { refType: BuiltinTypes.UNKNOWN }, // don't know how to do without value
+    audience: { refType: datasetAudience() },
+    baseRecord: { refType: datasetBaseRecord() },
+    columns: { refType: new ListType(datasetColumn()) },
+    criteria: { refType: datasetCriteria() },
+    description: { refType: datasetDescription() },
+    formulas: { refType: new ListType(datasetFormula()) },
+    id: { refType: BuiltinTypes.UNKNOWN },
+    definitionName: { refType: datasetName() },
+    definitionScriptId: { refType: BuiltinTypes.UNKNOWN },
+    version: { refType: BuiltinTypes.STRING },
+  },
+  path: [constants.NETSUITE, constants.TYPES_PATH, datasetDefinitionElemID().name],
+})
 
 export const DatasetType = (): TypeAndInnerTypes => {
   const innerTypes: Record<string, ObjectType> = {}
 
-  // ######################### Definition #########################################
-
-  // const datasetApplicationIdElemID = new ElemID(constants.NETSUITE, 'dataset_applicationId') // not sure if needed
-
-  const datasetAudienceElemID = new ElemID(constants.NETSUITE, 'dataset_audience')
-  const datasetAudience = createMatchingObjectType<Audience>({
-    elemID: datasetAudienceElemID,
-    annotations: {
-    },
-    fields: {
-      AudienceItems: { refType: new ListType(BuiltinTypes.UNKNOWN) },
-      isPublic: { refType: BuiltinTypes.BOOLEAN },
-    },
-    path: [constants.NETSUITE, constants.TYPES_PATH, datasetAudienceElemID.name],
-  })
-
-  const datasetDependenciesElemID = new ElemID(constants.NETSUITE, 'dataset_dependencies')
-  const datasetDependencies = createMatchingObjectType<Dependencies>({
-    elemID: datasetDependenciesElemID,
-    annotations: {
-    },
-    fields: {
-      dependency: {
-        refType: new ListType(BuiltinTypes.STRING),
-        annotations: {
-          _required: true,
-        },
-      },
-    },
-    path: [constants.NETSUITE, constants.TYPES_PATH, datasetDependenciesElemID.name],
-  })
-
-  const datasetBaseRecordElemID = new ElemID(constants.NETSUITE, 'dataset_baseRecord')
-  const datasetBaseRecord = createMatchingObjectType<BaseRecord>({
-    elemID: datasetBaseRecordElemID,
-    annotations: {
-    },
-    fields: {
-      id: { refType: BuiltinTypes.STRING },
-      label: { refType: BuiltinTypes.STRING },
-    },
-    path: [constants.NETSUITE, constants.TYPES_PATH, datasetBaseRecordElemID.name],
-  })
-
-
-  const datasetJoinTrailElemID = new ElemID(constants.NETSUITE, 'dataset_joinTrail')
-  const datasetJoinTrail = createMatchingObjectType<JoinTrail>({
-    elemID: datasetJoinTrailElemID,
-    annotations: {
-    },
-    fields: {
-      baseRecord: { refType: datasetBaseRecord },
-      joins: { refType: new ListType(BuiltinTypes.UNKNOWN) },
-      label: { refType: BuiltinTypes.STRING },
-      uniqueId: { refType: BuiltinTypes.STRING },
-    },
-    path: [constants.NETSUITE, constants.TYPES_PATH, datasetJoinTrailElemID.name],
-  })
-
-  const datasetFieldReferenceElemID = new ElemID(constants.NETSUITE, 'dataset_fieldReference')
-  const datasetFieldReference = createMatchingObjectType<FieldReference>({
-    elemID: datasetFieldReferenceElemID,
-    annotations: {
-    },
-    fields: {
-      id: { refType: BuiltinTypes.STRING },
-      joinTrail: { refType: datasetJoinTrail },
-      label: { refType: BuiltinTypes.STRING },
-      uniqueId: { refType: BuiltinTypes.STRING },
-    },
-    path: [constants.NETSUITE, constants.TYPES_PATH, datasetFieldReferenceElemID.name],
-  })
-
-  const datasetColumnElemID = new ElemID(constants.NETSUITE, 'dataset_column')
-  const datasetColumn = createMatchingObjectType<Column>({
-    elemID: datasetColumnElemID,
-    annotations: {
-    },
-    fields: {
-      alias: { refType: BuiltinTypes.STRING },
-      columnId: { refType: BuiltinTypes.NUMBER },
-      field: { refType: datasetFieldReference },
-      label: { refType: BuiltinTypes.STRING },
-    },
-    path: [constants.NETSUITE, constants.TYPES_PATH, datasetColumnElemID.name],
-  })
-
-  const datasetDescriptionElemID = new ElemID(constants.NETSUITE, 'dataset_description') // not sure
-  const datasetDescription = createMatchingObjectType<Description>({
-    elemID: datasetDescriptionElemID,
-    annotations: {
-    },
-    fields: {
-      translationScriptId: { refType: BuiltinTypes.STRING },
-    },
-    path: [constants.NETSUITE, constants.TYPES_PATH, datasetDescriptionElemID.name],
-  })
-
-  const datasetLabelElemID = new ElemID(constants.NETSUITE, 'dataset_label')
-  const datasetLabel = createMatchingObjectType<Label>({
-    elemID: datasetLabelElemID,
-    annotations: {
-    },
-    fields: {
-      translationScriptId: { refType: BuiltinTypes.STRING },
-    },
-    path: [constants.NETSUITE, constants.TYPES_PATH, datasetLabelElemID.name],
-  })
-
-  const datasetFormulaFormulaElemID = new ElemID(constants.NETSUITE, 'dataset_formula_formula')
-  const datasetFormulaFormula = createMatchingObjectType<FormulaFormula>({
-    elemID: datasetFormulaFormulaElemID,
-    annotations: {
-    },
-    fields: {
-      dataType: {
-        refType: BuiltinTypes.STRING,
-        annotations: {
-          [CORE_ANNOTATIONS.RESTRICTION]: createRestriction({ values: formulaDataTypeList }),
-        },
-      },
-      formulaSQL: { refType: BuiltinTypes.STRING },
-      id: { refType: BuiltinTypes.STRING },
-      label: { refType: datasetLabel },
-      uniqueId: { refType: BuiltinTypes.STRING },
-    },
-    path: [constants.NETSUITE, constants.TYPES_PATH, datasetFormulaFormulaElemID.name],
-  })
-
-  const datasetFormulaElemID = new ElemID(constants.NETSUITE, 'dataset_formula')
-  const datasetFormula = createMatchingObjectType<Formula>({
-    elemID: datasetFormulaElemID,
-    annotations: {
-    },
-    fields: {
-      fields: { refType: new ListType(datasetFieldReference) },
-      formula: { refType: datasetFormulaFormula },
-    },
-    path: [constants.NETSUITE, constants.TYPES_PATH, datasetFormulaElemID.name],
-  })
-
-  const datasetNameElemID = new ElemID(constants.NETSUITE, 'dataset_name') // not sure
-  const datasetName = createMatchingObjectType<Name>({
-    elemID: datasetNameElemID,
-    annotations: {
-    },
-    fields: {
-      translationScriptId: { refType: BuiltinTypes.STRING },
-    },
-    path: [constants.NETSUITE, constants.TYPES_PATH, datasetNameElemID.name],
-  })
-
-  const datasetCriteriaExpressionValueElemID = new ElemID(constants.NETSUITE, 'dataset_criteria_expression_value')
-  const datasetCriteriaExpressionValue = createMatchingObjectType<CriteriaChildExpressionValue>({
-    elemID: datasetCriteriaExpressionValueElemID,
-    annotations: {
-    },
-    fields: {
-      type: { refType: BuiltinTypes.STRING },
-      value: { refType: BuiltinTypes.STRING },
-    },
-    path: [constants.NETSUITE, constants.TYPES_PATH, datasetCriteriaExpressionValueElemID.name],
-  })
-
-  const datasetCriteriaChildExpressionElemID = new ElemID(constants.NETSUITE, 'dataset_criteria_expression')
-  const datasetCriteriaChildExpression = createMatchingObjectType<CriteriaExpression>({
-    elemID: datasetCriteriaChildExpressionElemID,
-    annotations: {
-    },
-    fields: {
-      label: { refType: BuiltinTypes.STRING },
-      subType: { refType: BuiltinTypes.UNKNOWN },
-      uiData: { refType: new ListType(BuiltinTypes.STRING) },
-      value: { refType: datasetCriteriaExpressionValue },
-    },
-    path: [constants.NETSUITE, constants.TYPES_PATH, datasetCriteriaChildExpressionElemID.name],
-  })
-
-  const datasetMetaElemID = new ElemID(constants.NETSUITE, 'dataset_meta')
-  const datasetMeta = createMatchingObjectType<Meta>({
-    elemID: datasetMetaElemID,
-    annotations: {
-    },
-    fields: {
-      selectorType: { refType: BuiltinTypes.UNKNOWN },
-      subType: { refType: BuiltinTypes.STRING },
-    },
-    path: [constants.NETSUITE, constants.TYPES_PATH, datasetMetaElemID.name],
-  })
-
-  const datasetOperatorElemID = new ElemID(constants.NETSUITE, 'dataset_operator')
-  const datasetOperator = createMatchingObjectType<Operator>({
-    elemID: datasetMetaElemID,
-    annotations: {
-    },
-    fields: {
-      code: {
-        refType: BuiltinTypes.STRING,
-        annotations: {
-          [CORE_ANNOTATIONS.RESTRICTION]: createRestriction({ values: codeList }),
-        },
-      },
-    },
-    path: [constants.NETSUITE, constants.TYPES_PATH, datasetOperatorElemID.name],
-  })
-
-  const datasetTargetFieldContextElemID = new ElemID(constants.NETSUITE, 'dataset_criteria_TargetFieldContext')
-  const datasetTargetFieldContext = createMatchingObjectType<CriteriaTargetFieldContext>({
-    elemID: datasetTargetFieldContextElemID,
-    annotations: {
-    },
-    fields: {
-      name: {
-        refType: BuiltinTypes.STRING,
-        annotations: {
-          [CORE_ANNOTATIONS.RESTRICTION]: createRestriction({ values: criteriaTargetFieldContextNameList }),
-        },
-      }, // dont know how to do it
-    },
-    path: [constants.NETSUITE, constants.TYPES_PATH, datasetTargetFieldContextElemID.name],
-  })
-
-  const datasetCriteriaElemID = new ElemID(constants.NETSUITE, 'dataset_criteria')
-  const datasetCriteria = createMatchingObjectType<Criteria>({
-    elemID: datasetCriteriaElemID,
-    annotations: {
-    },
-    fields: {
-      children: { refType: BuiltinTypes.UNKNOWN }, // don't know how to do without value
-      caseSensitive: { refType: BuiltinTypes.BOOLEAN },
-      expressions: { refType: new ListType(datasetCriteriaChildExpression) },
-      operator: { refType: datasetOperator },
-      targetFieldContext: { refType: datasetTargetFieldContext },
-      field: { refType: datasetFieldReference },
-      fieldStateName: { refType: BuiltinTypes.STRING },
-      meta: { refType: datasetMeta },
-    },
-    path: [constants.NETSUITE, constants.TYPES_PATH, datasetCriteriaElemID.name],
-  })
-  datasetCriteria.fields.children.refType = createRefToElmWithValue(new ListType(datasetCriteria))
-
   // innerTypes.applicationId = datasetApplicationId // not sure if needed
-  innerTypes.audience = datasetAudience
-  innerTypes.baseRecord = datasetBaseRecord
-  innerTypes.criteria = datasetCriteria
-  innerTypes.description = datasetDescription
-  innerTypes.name = datasetName
+  innerTypes.audience = datasetAudience()
+  innerTypes.baseRecord = datasetBaseRecord()
+  innerTypes.criteria = datasetCriteria()
+  innerTypes.description = datasetDescription()
+  innerTypes.name = datasetName()
 
-  const datasetElemID = new ElemID(constants.NETSUITE, 'dataset')
-  const reportdefinition = createMatchingObjectType<ParsedDataset>({
-    elemID: datasetElemID,
+  const datasetElemID = (): ElemID => new ElemID(constants.NETSUITE, 'dataset')
+  const dataset = (): ObjectType => createMatchingObjectType<ParsedDataset>({
+    elemID: datasetElemID(),
     fields: {
       scriptid: {
         refType: BuiltinTypes.SERVICE_ID,
@@ -431,34 +454,34 @@ export const DatasetType = (): TypeAndInnerTypes => {
         },
       },
       dependencies: {
-        refType: datasetDependencies,
+        refType: datasetDependencies(),
       },
       applicationId: {
         refType: BuiltinTypes.UNKNOWN,
       },
       audience: {
-        refType: datasetAudience,
+        refType: datasetAudience(),
       },
       baseRecord: {
-        refType: datasetBaseRecord,
+        refType: datasetBaseRecord(),
       },
       columns: {
-        refType: new ListType(datasetColumn),
+        refType: new ListType(datasetColumn()),
       },
       criteria: {
-        refType: datasetCriteria,
+        refType: datasetCriteria(),
       },
       description: {
-        refType: datasetDescription,
+        refType: datasetDescription(),
       },
       formulas: {
-        refType: new ListType(datasetFormula),
+        refType: new ListType(datasetFormula()),
       },
       id: {
         refType: BuiltinTypes.UNKNOWN,
       },
       definitionName: {
-        refType: datasetName,
+        refType: datasetName(),
       },
       definitionScriptId: {
         refType: BuiltinTypes.UNKNOWN,
@@ -466,10 +489,11 @@ export const DatasetType = (): TypeAndInnerTypes => {
       version: {
         refType: BuiltinTypes.STRING,
       },
+      ...datasetDefinition,
     },
     annotations: {
     },
-    path: [constants.NETSUITE, constants.TYPES_PATH, datasetElemID.name],
+    path: [constants.NETSUITE, constants.TYPES_PATH, datasetElemID().name],
   })
-  return { type: reportdefinition, innerTypes }
+  return { type: dataset(), innerTypes }
 }
