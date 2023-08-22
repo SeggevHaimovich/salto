@@ -14,10 +14,18 @@
 * limitations under the License.
 */
 
-import { InstanceElement, getChangeData, isAdditionChange, isAdditionOrModificationChange, ChangeError, isReferenceExpression, ChangeDataType, isInstanceElement } from '@salto-io/adapter-api'
-import { WALK_NEXT_STEP, WalkOnFunc, walkOnElement } from '@salto-io/adapter-utils'
+import { InstanceElement, getChangeData, isAdditionChange, isAdditionOrModificationChange, ChangeError, isReferenceExpression, ChangeDataType, isInstanceElement, Value } from '@salto-io/adapter-api'
+import { TransformFuncArgs, WALK_NEXT_STEP, WalkOnFunc, transformValues, walkOnElement } from '@salto-io/adapter-utils'
+import { parse } from 'fast-xml-parser'
+import { decode } from 'he'
+import { logger } from '@salto-io/logging'
+import { datasetDefinition } from '../type_parsers/dataset_parsing/parsed_dataset'
+import { ATTRIBUTE_PREFIX } from '../client/constants'
+import { DEFXML } from '../client/bla'
 import { isFileInstance } from '../types'
 import { NetsuiteChangeValidator } from './types'
+
+const log = logger(module)
 
 const getUnreferencedFilesFullNames = (
   files: InstanceElement[],
@@ -41,6 +49,23 @@ const getUnreferencedFilesFullNames = (
 }
 
 const changeValidator: NetsuiteChangeValidator = async changes => {
+  const definitionValues = parse(DEFXML, {
+    attributeNamePrefix: ATTRIBUTE_PREFIX,
+    ignoreAttributes: false,
+    tagValueProcessor: val => decode(val),
+  })
+  const tryfunc = ({ value, field, path }: TransformFuncArgs): Value => {
+    log.debug('lets see %o, %o', field, path)
+    return value
+  }
+  const values = transformValues({
+    values: definitionValues.root,
+    type: datasetDefinition(),
+    transformFunc: tryfunc,
+    strict: false,
+  })
+  const val2 = await values
+  log.debug('bla %o', val2)
   const additionAndModificationChanges = changes
     .filter(isAdditionOrModificationChange)
   const fileAdditions = additionAndModificationChanges

@@ -153,8 +153,9 @@ type DatasetDefinitionType = {
   description?: Description
   formulas?: Formula[]
   id?: DefinitionId
-  definitionName?: Name
-  definitionScriptId?: DefinitionScriptId
+  name?: Name
+  ownerId?: number
+  scriptId?: DefinitionScriptId
   version?: string
 }
 
@@ -164,7 +165,7 @@ export type ParsedDataset = {
   dependencies?: {
     dependency?: string[]
   }
-} & DatasetDefinitionType
+} & Omit<DatasetDefinitionType, 'scriptId' | 'name'>
 
 const datasetAudienceElemID = (): ElemID => new ElemID(constants.NETSUITE, 'dataset_audience')
 const datasetAudience = (): ObjectType => createMatchingObjectType<Audience>({
@@ -410,7 +411,7 @@ export const datasetDefinition = (): ObjectType => createMatchingObjectType<Data
   annotations: {
   },
   fields: {
-    applicationId: { refType: BuiltinTypes.UNKNOWN }, // don't know how to do without value
+    applicationId: { refType: BuiltinTypes.UNKNOWN },
     audience: { refType: datasetAudience() },
     baseRecord: { refType: datasetBaseRecord() },
     columns: { refType: new ListType(datasetColumn()) },
@@ -418,8 +419,9 @@ export const datasetDefinition = (): ObjectType => createMatchingObjectType<Data
     description: { refType: datasetDescription() },
     formulas: { refType: new ListType(datasetFormula()) },
     id: { refType: BuiltinTypes.UNKNOWN },
-    definitionName: { refType: datasetName() },
-    definitionScriptId: { refType: BuiltinTypes.UNKNOWN },
+    name: { refType: datasetName() },
+    ownerId: { refType: BuiltinTypes.NUMBER },
+    scriptId: { refType: BuiltinTypes.UNKNOWN },
     version: { refType: BuiltinTypes.STRING },
   },
   path: [constants.NETSUITE, constants.TYPES_PATH, datasetDefinitionElemID().name],
@@ -430,10 +432,10 @@ export const DatasetType = (): TypeAndInnerTypes => {
 
   // innerTypes.applicationId = datasetApplicationId // not sure if needed
   innerTypes.audience = datasetAudience()
-  innerTypes.baseRecord = datasetBaseRecord()
-  innerTypes.criteria = datasetCriteria()
-  innerTypes.description = datasetDescription()
-  innerTypes.name = datasetName()
+  // innerTypes.baseRecord = datasetBaseRecord()
+  // innerTypes.criteria = datasetCriteria()
+  // innerTypes.description = datasetDescription()
+  // innerTypes.name = datasetName()
 
   const datasetElemID = (): ElemID => new ElemID(constants.NETSUITE, 'dataset')
   const dataset = (): ObjectType => createMatchingObjectType<ParsedDataset>({
@@ -453,43 +455,18 @@ export const DatasetType = (): TypeAndInnerTypes => {
           _required: true,
         },
       },
-      dependencies: {
-        refType: datasetDependencies(),
-      },
-      applicationId: {
-        refType: BuiltinTypes.UNKNOWN,
-      },
-      audience: {
-        refType: datasetAudience(),
-      },
-      baseRecord: {
-        refType: datasetBaseRecord(),
-      },
-      columns: {
-        refType: new ListType(datasetColumn()),
-      },
-      criteria: {
-        refType: datasetCriteria(),
-      },
-      description: {
-        refType: datasetDescription(),
-      },
-      formulas: {
-        refType: new ListType(datasetFormula()),
-      },
-      id: {
-        refType: BuiltinTypes.UNKNOWN,
-      },
-      definitionName: {
-        refType: datasetName(),
-      },
-      definitionScriptId: {
-        refType: BuiltinTypes.UNKNOWN,
-      },
-      version: {
-        refType: BuiltinTypes.STRING,
-      },
-      ...datasetDefinition,
+      dependencies: { refType: datasetDependencies() },
+      applicationId: { refType: BuiltinTypes.UNKNOWN },
+      audience: { refType: datasetAudience() },
+      baseRecord: { refType: datasetBaseRecord() },
+      columns: { refType: new ListType(datasetColumn()) },
+      criteria: { refType: datasetCriteria() },
+      description: { refType: datasetDescription() },
+      formulas: { refType: new ListType(datasetFormula()) },
+      id: { refType: BuiltinTypes.UNKNOWN },
+      ownerId: { refType: BuiltinTypes.NUMBER },
+      version: { refType: BuiltinTypes.STRING },
+      // ...datasetDefinition,
     },
     annotations: {
     },
