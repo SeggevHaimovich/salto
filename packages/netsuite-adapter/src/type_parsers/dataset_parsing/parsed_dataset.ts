@@ -74,7 +74,7 @@ type Column = {
   field?: FieldReference
   label?: string // check it
 }
-type CriteriaChildExpressionValue = {
+type CriteriaExpressionValue = {
   type?: string
   value?: string
 }
@@ -82,7 +82,7 @@ type CriteriaExpression = {
   label?: string
   subType?: CriteriaExpressionSubType
   uiData?: CriteriaExpressionUiData[]
-  value?: CriteriaChildExpressionValue
+  value?: CriteriaExpressionValue
 }
 
 // TODO add all the options to all
@@ -161,11 +161,10 @@ type DatasetDefinitionType = {
 
 export type ParsedDataset = {
   scriptid: string
-  name: string
   dependencies?: {
     dependency?: string[]
   }
-} & Omit<DatasetDefinitionType, 'scriptId' | 'name'>
+} & Omit<DatasetDefinitionType, 'scriptId'>
 
 const datasetAudienceElemID = (): ElemID => new ElemID(constants.NETSUITE, 'dataset_audience')
 const datasetAudience = (): ObjectType => createMatchingObjectType<Audience>({
@@ -317,7 +316,7 @@ const datasetName = (): ObjectType => createMatchingObjectType<Name>({
 })
 
 const datasetCriteriaExpressionValueElemID = (): ElemID => new ElemID(constants.NETSUITE, 'dataset_criteria_expression_value')
-const datasetCriteriaExpressionValue = (): ObjectType => createMatchingObjectType<CriteriaChildExpressionValue>({
+const datasetCriteriaExpressionValue = (): ObjectType => createMatchingObjectType<CriteriaExpressionValue>({
   elemID: datasetCriteriaExpressionValueElemID(),
   annotations: {
   },
@@ -328,9 +327,9 @@ const datasetCriteriaExpressionValue = (): ObjectType => createMatchingObjectTyp
   path: [constants.NETSUITE, constants.TYPES_PATH, datasetCriteriaExpressionValueElemID().name],
 })
 
-const datasetCriteriaChildExpressionElemID = (): ElemID => new ElemID(constants.NETSUITE, 'dataset_criteria_expression')
-const datasetCriteriaChildExpression = (): ObjectType => createMatchingObjectType<CriteriaExpression>({
-  elemID: datasetCriteriaChildExpressionElemID(),
+const datasetCriteriaExpressionElemID = (): ElemID => new ElemID(constants.NETSUITE, 'dataset_criteria_expression')
+const datasetCriteriaExpression = (): ObjectType => createMatchingObjectType<CriteriaExpression>({
+  elemID: datasetCriteriaExpressionElemID(),
   annotations: {
   },
   fields: {
@@ -339,7 +338,7 @@ const datasetCriteriaChildExpression = (): ObjectType => createMatchingObjectTyp
     uiData: { refType: new ListType(BuiltinTypes.STRING) },
     value: { refType: datasetCriteriaExpressionValue() },
   },
-  path: [constants.NETSUITE, constants.TYPES_PATH, datasetCriteriaChildExpressionElemID().name],
+  path: [constants.NETSUITE, constants.TYPES_PATH, datasetCriteriaExpressionElemID().name],
 })
 
 const datasetMetaElemID = (): ElemID => new ElemID(constants.NETSUITE, 'dataset_meta')
@@ -394,7 +393,7 @@ const datasetCriteria = (): ObjectType => createMatchingObjectType<Criteria>({
   fields: {
     children: { refType: BuiltinTypes.UNKNOWN }, // don't know how to do without value
     caseSensitive: { refType: BuiltinTypes.BOOLEAN },
-    expressions: { refType: new ListType(datasetCriteriaChildExpression()) },
+    expressions: { refType: new ListType(datasetCriteriaExpression()) },
     operator: { refType: datasetOperator() },
     targetFieldContext: { refType: datasetTargetFieldContext() },
     field: { refType: datasetFieldReference() },
@@ -430,12 +429,23 @@ export const datasetDefinition = (): ObjectType => createMatchingObjectType<Data
 export const DatasetType = (): TypeAndInnerTypes => {
   const innerTypes: Record<string, ObjectType> = {}
 
-  // innerTypes.applicationId = datasetApplicationId // not sure if needed
+  innerTypes.name = datasetName()
   innerTypes.audience = datasetAudience()
-  // innerTypes.baseRecord = datasetBaseRecord()
-  // innerTypes.criteria = datasetCriteria()
-  // innerTypes.description = datasetDescription()
-  // innerTypes.name = datasetName()
+  innerTypes.dependencies = datasetDependencies()
+  innerTypes.baseRecord = datasetBaseRecord()
+  innerTypes.joinTrail = datasetJoinTrail()
+  innerTypes.fieldReference = datasetFieldReference()
+  innerTypes.column = datasetColumn()
+  innerTypes.description = datasetDescription()
+  innerTypes.label = datasetLabel()
+  innerTypes.formulaFormula = datasetFormulaFormula()
+  innerTypes.formula = datasetFormula()
+  innerTypes.criteriaExpressionValue = datasetCriteriaExpressionValue()
+  innerTypes.criteriaExpression = datasetCriteriaExpression()
+  innerTypes.criteriaMeta = datasetMeta()
+  innerTypes.operator = datasetOperator()
+  innerTypes.context = datasetTargetFieldContext()
+  innerTypes.criteria = datasetCriteria()
 
   const datasetElemID = (): ElemID => new ElemID(constants.NETSUITE, 'dataset')
   const dataset = (): ObjectType => createMatchingObjectType<ParsedDataset>({
@@ -449,12 +459,7 @@ export const DatasetType = (): TypeAndInnerTypes => {
           [CORE_ANNOTATIONS.RESTRICTION]: createRestriction({ regex: '^custdataset[0-9a-z_]+' }),
         },
       },
-      name: {
-        refType: BuiltinTypes.STRING,
-        annotations: {
-          _required: true,
-        },
-      },
+      name: { refType: datasetName() },
       dependencies: { refType: datasetDependencies() },
       applicationId: { refType: BuiltinTypes.UNKNOWN },
       audience: { refType: datasetAudience() },
@@ -466,7 +471,6 @@ export const DatasetType = (): TypeAndInnerTypes => {
       id: { refType: BuiltinTypes.UNKNOWN },
       ownerId: { refType: BuiltinTypes.NUMBER },
       version: { refType: BuiltinTypes.STRING },
-      // ...datasetDefinition,
     },
     annotations: {
     },

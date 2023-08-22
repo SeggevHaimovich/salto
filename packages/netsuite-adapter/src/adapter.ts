@@ -39,6 +39,7 @@ import removeUnsupportedTypes from './filters/remove_unsupported_types'
 import dataInstancesInternalId from './filters/data_instances_internal_id'
 import dataInstancesReferences from './filters/data_instances_references'
 import dataTypesCustomFields from './filters/data_types_custom_fields'
+import datasetDefinitionHandle from './filters/dataset_definition_handle'
 import dataInstancesCustomFields from './filters/data_instances_custom_fields'
 import dataInstancesAttributes from './filters/data_instances_attributes'
 import dataInstancesNullFields from './filters/data_instances_null_fields'
@@ -108,6 +109,7 @@ export const allFilters: (LocalFilterCreatorDefinition | RemoteFilterCreatorDefi
   { creator: hiddenFields },
   { creator: replaceRecordRef },
   { creator: dataTypesCustomFields },
+  { creator: datasetDefinitionHandle },
   { creator: dataInstancesCustomFields },
   { creator: dataInstancesNullFields },
   { creator: removeUnsupportedTypes },
