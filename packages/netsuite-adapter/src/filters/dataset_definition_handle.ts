@@ -14,8 +14,10 @@
 * limitations under the License.
 */
 
-import { BuiltinTypes, ElemID, getChangeData, InstanceElement, isInstanceChange, isInstanceElement, isListType, isObjectType, ObjectType, ReferenceExpression, TypeElement, Value } from '@salto-io/adapter-api'
-import _, { isPlainObject, isString } from 'lodash'
+/* eslint-disable dot-notation */
+
+import { BuiltinTypes, ElemID, getChangeData, InstanceElement, isInstanceChange, isInstanceElement, isObjectType, ObjectType, ReferenceExpression, Value } from '@salto-io/adapter-api'
+import _, { isString } from 'lodash'
 import { TransformFuncArgs, transformValues } from '@salto-io/adapter-utils'
 import { logger } from '@salto-io/logging'
 import { parse } from 'fast-xml-parser'
@@ -45,20 +47,17 @@ const filterCreator: LocalFilterCreator = () => ({
             if (value['@_type'] === 'null') {
               return {}
             } if (value['@_type'] === 'array') {
-              // eslint-disable-next-line dot-notation
-              return value['_ITEM_']
+              return (Array.isArray(value['_ITEM_'])) ? value['_ITEM_'] : [value['_ITEM_']]
             } if (value['@_type'] === 'boolean') {
               return value['#text']
             } if (value['@_type'] === 'string') {
               return String(value['#text'])
             }
           }
-          // eslint-disable-next-line dot-notation
-          if ('_T_' in value && value['_T_'] !== 'dataSet') {
-            return {
-              // eslint-disable-next-line dot-notation
+          if ('_T_' in value) {
+            return (value['_T_'] !== 'dataSet' && value['_T_'] !== 'formula') ? {
               [value['_T_']]: _.omit(value, '_T_'),
-            }
+            } : _.omit(value, '_T_')
           }
           return value
         }
@@ -92,8 +91,8 @@ const filterCreator: LocalFilterCreator = () => ({
       })
       const finalValue = {
         // ..._.omit(instance.value, 'definition'),
-        ...instance.value,
-        ..._.omit(await values, 'name'),
+        ...(await values),
+        ..._.omit(instance.value, 'name'),
       }
       instance.value = finalValue
       return instance
@@ -118,34 +117,36 @@ const filterCreator: LocalFilterCreator = () => ({
     // elements.push(await createDatasetInstances(parsedInstances[4]))
   },
   preDeploy: async changes => {
-    const addTypeField = (field: TypeElement | undefined, value: Value): Value => {
-      if (field !== undefined) {
-        if (isListType(field)) {
-          return {
-            '@_type': 'array',
-            _ITEM_: value,
-          }
-        }
-        if (field.elemID.typeName === 'boolean') {
-          return {
-            '@_type': 'boolean',
-            '#text': value,
-          }
-        }
-      }
-      return value
-    }
+    // const addTypeField = (field: TypeElement | undefined, value: Value): Value => {
+    //   if (field !== undefined) {
+    //     if (isListType(field)) {
+    //       return {
+    //         '@_type': 'array',
+    //         _ITEM_: value,
+    //       }
+    //     }
+    //     if (field.elemID.typeName === 'boolean') {
+    //       return {
+    //         '@_type': 'boolean',
+    //         '#text': value,
+    //       }
+    //     }
+    //   }
+    //   return value
+    // }
     const returnToOriginalShape = async (instance: InstanceElement): Promise<void> => {
-      const valueChanges = async ({ value, field }: TransformFuncArgs): Promise<Value> => {
-        const fieldType = await field?.getType()
-        if (isObjectType(fieldType) && isPlainObject(value)) {
-          Object.keys(fieldType.fields).forEach(async key => {
-            if (!(key in value)) {
-              value[key] = _.pick(addTypeField(await fieldType.fields[key].getType(), undefined))
-            }
-          })
-        }
-        return addTypeField(fieldType, value)
+      const valueChanges = async ({ value, field, path }: TransformFuncArgs): Promise<Value> => {
+        // const fieldType = await field?.getType()
+        // if (isObjectType(fieldType) && isPlainObject(value)) {
+        //   Object.keys(fieldType.fields).forEach(async key => {
+        //     if (!(key in value)) {
+        //       value[key] = _.pick(addTypeField(await fieldType.fields[key].getType(), undefined))
+        //     }
+        //   })
+        // }
+        // return addTypeField(fieldType, value)
+        log.debug('hello %o, %o, %o', value, field, path)
+        return value
       }
       // const option1 = (): Values => {
       //   const nameSplit = instance.value.name.elemID.getFullName().split('.')

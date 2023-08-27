@@ -18,8 +18,6 @@ import { createMatchingObjectType } from '@salto-io/adapter-utils'
 import { TypeAndInnerTypes } from '../../types/object_types'
 import * as constants from '../../constants'
 
-// do I need inner types to inner types? what are they here for?
-
 // can't deploy ownerId - do strange thing (change and stay after fetch, doesn't change the owner in the UI)
 
 // TODO add all the options to all
@@ -40,7 +38,7 @@ type FieldReferenceJoinTrailJoin = Value
 type CriteriaExpressionSubType = Value
 type CriteriaExpressionUiData = Value
 
-// we should ignore these values
+// maybe we should ignore these values
 type ApplicationId = Value
 type DefinitionId = Value
 type DefinitionScriptId = Value
@@ -91,8 +89,8 @@ type Formula = {
 }
 
 type FieldorFormula = {
-  field?: FieldReference
-  formula?: Formula
+  fieldReference?: FieldReference
+  dataSetFormula?: Formula
 }
 
 type Column = {
@@ -139,6 +137,7 @@ type Condition = {
   operator?: Operator
   // eslint-disable-next-line no-use-before-define
   children?: ConditionOrFilter[]
+  targetFieldContext?: CriteriaTargetFieldContext
 }
 
 type ConditionOrFilter = {
@@ -174,7 +173,7 @@ export type ParsedDataset = {
   dependencies?: {
     dependency?: string[]
   }
-} & Omit<DatasetDefinitionType, 'scriptId'>
+} & DatasetDefinitionType
 
 export const ParsedDatasetType = (): TypeAndInnerTypes => {
   const innerTypes: Record<string, ObjectType> = {}
@@ -300,8 +299,8 @@ export const ParsedDatasetType = (): TypeAndInnerTypes => {
       XML_TYPE_DESCRIBER: 'field or formula',
     },
     fields: {
-      field: { refType: datasetFieldReference },
-      formula: { refType: datasetFormula },
+      fieldReference: { refType: datasetFieldReference },
+      dataSetFormula: { refType: datasetFormula },
     },
     path: [constants.NETSUITE, constants.TYPES_PATH, constants.DATASET],
   })
@@ -439,9 +438,8 @@ export const ParsedDatasetType = (): TypeAndInnerTypes => {
     },
     fields: {
       children: { refType: BuiltinTypes.UNKNOWN },
-      operator: {
-        refType: datasetOperator,
-      },
+      operator: { refType: datasetOperator },
+      targetFieldContext: { refType: datasetTargetFieldContext },
     },
     path: [constants.NETSUITE, constants.TYPES_PATH, constants.DATASET],
   })
@@ -495,11 +493,12 @@ export const ParsedDatasetType = (): TypeAndInnerTypes => {
         },
       },
       name: {
-        refType: createRefToElmWithValue(BuiltinTypes.STRING),
-        annotations: {
-          [CORE_ANNOTATIONS.REQUIRED]: true,
-          // [constants.IS_ATTRIBUTE]: true,
-        },
+        refType: datasetName,
+        // refType: createRefToElmWithValue(BuiltinTypes.STRING),
+        // annotations: {
+        //   [CORE_ANNOTATIONS.REQUIRED]: true,
+        //   // [constants.IS_ATTRIBUTE]: true,
+        // },
       },
       dependencies: { refType: datasetDependencies },
       applicationId: { refType: BuiltinTypes.UNKNOWN },
@@ -512,6 +511,7 @@ export const ParsedDatasetType = (): TypeAndInnerTypes => {
       id: { refType: BuiltinTypes.UNKNOWN },
       ownerId: { refType: BuiltinTypes.NUMBER },
       version: { refType: BuiltinTypes.STRING },
+      scriptId: { refType: BuiltinTypes.UNKNOWN },
     },
     annotations: {
       XML_TYPE_DESCRIBER: '_dataset_',
