@@ -14,17 +14,19 @@
 * limitations under the License.
 */
 
-import { BuiltinTypes, ElemID, getChangeData, InstanceElement, isInstanceChange, isInstanceElement, isObjectType, isReferenceExpression, ObjectType, ReferenceExpression, Value, Values } from '@salto-io/adapter-api'
-import _, { isString } from 'lodash'
+import { BuiltinTypes, ElemID, getChangeData, InstanceElement, isInstanceChange, isInstanceElement, isListType, isObjectType, ObjectType, ReferenceExpression, TypeElement, Value } from '@salto-io/adapter-api'
+import _, { isPlainObject, isString } from 'lodash'
 import { TransformFuncArgs, transformValues } from '@salto-io/adapter-utils'
+import { logger } from '@salto-io/logging'
 import { parse } from 'fast-xml-parser'
 import { decode } from 'he'
 import { DATASET, NETSUITE } from '../constants'
 import { LocalFilterCreator } from '../filter'
 import { ParsedDatasetType } from '../type_parsers/dataset_parsing/parsed_dataset'
 import { ATTRIBUTE_PREFIX } from '../client/constants'
-import { convertToXmlContent } from '../client/sdf_parser'
+// import { convertToXmlContent } from '../client/sdf_parser'
 
+const log = logger(module)
 
 const elemIdPath = ['translationcollection', 'instance', 'strings', 'string', 'scriptid']
 const filterCreator: LocalFilterCreator = () => ({
@@ -51,7 +53,14 @@ const filterCreator: LocalFilterCreator = () => ({
               return String(value['#text'])
             }
           }
-          return _.omit(value, '_T_')
+          // eslint-disable-next-line dot-notation
+          if ('_T_' in value && value['_T_'] !== 'dataSet') {
+            return {
+              // eslint-disable-next-line dot-notation
+              [value['_T_']]: _.omit(value, '_T_'),
+            }
+          }
+          return value
         }
         if (isString(value) && value.startsWith('custcollectiontranslations')) {
           const nameParts = value.split('.')
@@ -109,22 +118,52 @@ const filterCreator: LocalFilterCreator = () => ({
     // elements.push(await createDatasetInstances(parsedInstances[4]))
   },
   preDeploy: async changes => {
-    const returnToOriginalShape = async (instance: InstanceElement): Promise<void> => {
-      const valueChanges = async ({ value }: TransformFuncArgs): Promise<Value> => value
-      const option1 = (): Values => {
-        const nameSplit = instance.value.name.elemID.getFullName().split('.')
-        const nameForDefinition = nameSplit[3] + nameSplit[6]
-        return {
-          ..._.omit(instance.value, ['name', 'scriptid', 'dependencies']),
-          name: {
-            translationScriptId: nameForDefinition,
-          },
+    const addTypeField = (field: TypeElement | undefined, value: Value): Value => {
+      if (field !== undefined) {
+        if (isListType(field)) {
+          return {
+            '@_type': 'array',
+            _ITEM_: value,
+          }
+        }
+        if (field.elemID.typeName === 'boolean') {
+          return {
+            '@_type': 'boolean',
+            '#text': value,
+          }
         }
       }
-      const option2 = (): Values => ({
-        ..._.omit(instance.value, ['scriptid', 'dependencies']),
-      })
-      const definitionValues = isReferenceExpression(instance.value.name) ? option1() : option2()
+      return value
+    }
+    const returnToOriginalShape = async (instance: InstanceElement): Promise<void> => {
+      const valueChanges = async ({ value, field }: TransformFuncArgs): Promise<Value> => {
+        const fieldType = await field?.getType()
+        if (isObjectType(fieldType) && isPlainObject(value)) {
+          Object.keys(fieldType.fields).forEach(async key => {
+            if (!(key in value)) {
+              value[key] = _.pick(addTypeField(await fieldType.fields[key].getType(), undefined))
+            }
+          })
+        }
+        return addTypeField(fieldType, value)
+      }
+      // const option1 = (): Values => {
+      //   const nameSplit = instance.value.name.elemID.getFullName().split('.')
+      //   const nameForDefinition = nameSplit[3] + nameSplit[6]
+      //   return {
+      //     ..._.omit(instance.value, ['name', 'scriptid', 'dependencies', 'definition']),
+      //     name: {
+      //       translationScriptId: nameForDefinition,
+      //     },
+      //   }
+      // }
+      // const option2 = (): Values => ({
+      //   ..._.omit(instance.value, ['scriptid', 'dependencies', 'definition']),
+      // })
+      // const definitionValues = isReferenceExpression(instance.value.name) ? option1() : option2()
+      const definitionValues = {
+        ..._.omit(instance.value, ['scriptid', 'dependencies', 'definition', 'name']),
+      }
       const values = transformValues({
         values: definitionValues,
         type: ParsedDatasetType().type,
@@ -133,16 +172,17 @@ const filterCreator: LocalFilterCreator = () => ({
         pathID: instance.elemID,
       })
       const bla = await values
-      const bla2 = (bla !== undefined) ? convertToXmlContent({
-        typeName: 'root',
-        values: bla,
-      }) : ''
-      instance.value = {
-        name: instance.value.name,
-        scriptid: instance.value.scriptid,
-        dependencies: instance.value.dependencies,
-        definition: bla2,
-      }
+      log.debug('adsckjb %o', bla)
+      // const bla2 = (bla !== undefined) ? convertToXmlContent({
+      //   typeName: 'root',
+      //   values: bla,
+      // }) : ''
+      // instance.value = {
+      //   name: instance.value.name,
+      //   scriptid: instance.value.scriptid,
+      //   dependencies: instance.value.dependencies,
+      //   definition: bla2,
+      // }
     }
 
     changes
