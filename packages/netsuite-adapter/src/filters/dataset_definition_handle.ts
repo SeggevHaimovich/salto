@@ -16,17 +16,17 @@
 
 /* eslint-disable dot-notation */
 
-import { BuiltinTypes, ElemID, getChangeData, InstanceElement, isInstanceChange, isInstanceElement, isObjectType, ObjectType, ReferenceExpression, Value } from '@salto-io/adapter-api'
-import _, { isString } from 'lodash'
-import { TransformFuncArgs, transformValues } from '@salto-io/adapter-utils'
+import { BuiltinTypes, Change, ElemID, getChangeData, InstanceElement, isInstanceChange, isInstanceElement, isObjectType, ObjectType, ReferenceExpression, Value } from '@salto-io/adapter-api'
+import _, { isBoolean, isPlainObject, isString } from 'lodash'
+import { TransformFuncArgs, transformValues, WALK_NEXT_STEP, WalkOnFunc, walkOnValue } from '@salto-io/adapter-utils'
 import { logger } from '@salto-io/logging'
 import { parse } from 'fast-xml-parser'
 import { decode } from 'he'
 import { DATASET, NETSUITE } from '../constants'
 import { LocalFilterCreator } from '../filter'
-import { ParsedDatasetType } from '../type_parsers/dataset_parsing/parsed_dataset'
+import { ParsedDatasetType, XML_TYPE_DESCRIBER } from '../type_parsers/dataset_parsing/parsed_dataset'
 import { ATTRIBUTE_PREFIX } from '../client/constants'
-// import { convertToXmlContent } from '../client/sdf_parser'
+import { PreDeployParsedDatasetType } from '../type_parsers/dataset_parsing/predeploy_parsed_dataset'
 
 const log = logger(module)
 
@@ -88,6 +88,7 @@ const filterCreator: LocalFilterCreator = () => ({
         transformFunc: valueChanges,
         strict: false,
         pathID: instance.elemID,
+        allowEmpty: false,
       })
       const finalValue = {
         // ..._.omit(instance.value, 'definition'),
@@ -116,7 +117,7 @@ const filterCreator: LocalFilterCreator = () => ({
     // )
     // elements.push(await createDatasetInstances(parsedInstances[4]))
   },
-  preDeploy: async changes => {
+  preDeploy2: async (changes: Change[]) => {
     // const addTypeField = (field: TypeElement | undefined, value: Value): Value => {
     //   if (field !== undefined) {
     //     if (isListType(field)) {
@@ -128,7 +129,7 @@ const filterCreator: LocalFilterCreator = () => ({
     //     if (field.elemID.typeName === 'boolean') {
     //       return {
     //         '@_type': 'boolean',
-    //         '#text': value,
+    //         '#text': String(value),
     //       }
     //     }
     //   }
@@ -136,7 +137,21 @@ const filterCreator: LocalFilterCreator = () => ({
     // }
     const returnToOriginalShape = async (instance: InstanceElement): Promise<void> => {
       const valueChanges = async ({ value, field, path }: TransformFuncArgs): Promise<Value> => {
-        // const fieldType = await field?.getType()
+        const fieldType = await field?.getType()
+        let ans = value
+        if (fieldType !== undefined && XML_TYPE_DESCRIBER in fieldType?.annotations) {
+          if (fieldType.annotations[XML_TYPE_DESCRIBER] !== 'formula') {
+            ans = {
+              ...value[Object.keys(value)[0]],
+              _T_: fieldType.annotations[XML_TYPE_DESCRIBER],
+            }
+          } else {
+            ans = {
+              ...value,
+              _T_: fieldType.annotations[XML_TYPE_DESCRIBER],
+            }
+          }
+        }
         // if (isObjectType(fieldType) && isPlainObject(value)) {
         //   Object.keys(fieldType.fields).forEach(async key => {
         //     if (!(key in value)) {
@@ -146,22 +161,8 @@ const filterCreator: LocalFilterCreator = () => ({
         // }
         // return addTypeField(fieldType, value)
         log.debug('hello %o, %o, %o', value, field, path)
-        return value
+        return ans
       }
-      // const option1 = (): Values => {
-      //   const nameSplit = instance.value.name.elemID.getFullName().split('.')
-      //   const nameForDefinition = nameSplit[3] + nameSplit[6]
-      //   return {
-      //     ..._.omit(instance.value, ['name', 'scriptid', 'dependencies', 'definition']),
-      //     name: {
-      //       translationScriptId: nameForDefinition,
-      //     },
-      //   }
-      // }
-      // const option2 = (): Values => ({
-      //   ..._.omit(instance.value, ['scriptid', 'dependencies', 'definition']),
-      // })
-      // const definitionValues = isReferenceExpression(instance.value.name) ? option1() : option2()
       const definitionValues = {
         ..._.omit(instance.value, ['scriptid', 'dependencies', 'definition', 'name']),
       }
@@ -174,6 +175,8 @@ const filterCreator: LocalFilterCreator = () => ({
       })
       const bla = await values
       log.debug('adsckjb %o', bla)
+      const wantedType = PreDeployParsedDatasetType()
+      log.debug('acd %o', wantedType)
       // const bla2 = (bla !== undefined) ? convertToXmlContent({
       //   typeName: 'root',
       //   values: bla,
@@ -186,6 +189,99 @@ const filterCreator: LocalFilterCreator = () => ({
       // }
     }
 
+    changes
+      .filter(isInstanceChange)
+      .map(getChangeData)
+      .filter(instance => instance.elemID.typeName === DATASET)
+      .forEach(returnToOriginalShape)
+  },
+  preDeploy: async (changes: Change[]) => {
+    const types: Set<string> = new Set([
+      'fieldReference',
+      'dataSetFormula',
+      'condition',
+      'filter',
+    ])
+    const isNumberStr = (str: string): boolean => !Number.isNaN(Number(str))
+    const returnToOriginalShape = async (instance: InstanceElement): Promise<void> => {
+      const walkFunc: WalkOnFunc = ({ value }) => {
+        const checkChanges = (key: string | number): Value => {
+          if (Array.isArray(value[key])) {
+            return {
+              '@_type': 'array',
+              _ITEM_: value[key],
+            }
+          }
+          if (isBoolean(value[key])) {
+            // eslint-disable-next-line no-param-reassign
+            return {
+              '@_type': 'boolean',
+              '#text': value[key],
+            }
+          }
+          if (isString(value[key]) && isNumberStr(value[key])) {
+            return {
+              '@_type': 'string',
+              '#text': value[key],
+            }
+          }
+          return value[key]
+        }
+        const checkT = (key: string | number): Value => {
+          if (key === 'formula') {
+            return {
+              _T_: 'formula',
+              ...value[key],
+            }
+          }
+          const innerVal = value[key]
+          if (isPlainObject(innerVal)) {
+            const innerkeys = Object.keys(innerVal)
+            if (innerkeys.length === 1 && types.has(innerkeys[0])) {
+              return {
+                _T_: innerkeys[0],
+                ...value[key][innerkeys[0]],
+              }
+            }
+          }
+          return value[key]
+        }
+        if (isPlainObject(value)) {
+          const keys = Object.keys(value)
+
+          // check if contains a field with _T_
+          // keys.map(checkT)
+          for (const key of keys) {
+            value[key] = checkT(key)
+          }
+
+          // check if contains a field that supposed to have @_type
+          if (!('@_type' in value)) {
+            // keys.map(checkChanges)
+            for (const key of keys) {
+              value[key] = checkChanges(key)
+            }
+          }
+        }
+        if (Array.isArray(value)) {
+          // eslint-disable-next-line no-plusplus
+          for (let i = 0; i < value.length; i++) {
+            value[i] = checkT(i)
+            value[i] = checkChanges(i)
+          }
+        }
+        return WALK_NEXT_STEP.RECURSE
+      }
+      const definitionValues = {
+        ..._.omit(instance.value, ['scriptid', 'dependencies', 'definition', 'name']),
+      }
+      walkOnValue({
+        elemId: instance.elemID,
+        value: definitionValues,
+        func: walkFunc,
+      })
+      log.debug('bla %o', instance)
+    }
     changes
       .filter(isInstanceChange)
       .map(getChangeData)

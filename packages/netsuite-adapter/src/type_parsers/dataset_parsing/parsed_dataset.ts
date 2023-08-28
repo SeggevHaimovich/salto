@@ -27,11 +27,13 @@ const codeList = ['AND', 'OR',
   'LESS', 'GREATER', 'EQUAL', 'EQUAL_NOT', 'GREATER_OR_EQUAL', 'LESS_OR_EQUAL', 'BETWEEN', 'BETWEEN_NOT'] as const
 const criteriaTargetFieldContextNameList = ['DEFAULT', 'IDENTIFIER', 'UNCONSOLIDATED'] as const
 const formulaDataTypeList = ['INTEGER', 'BOOLEAN', 'DATE', 'DATETIME', 'FLOAT', 'STRING', 'CLOBTEXT', 'PERCENT', 'DURATION'] as const
+const validityList = ['VALID'] // ????? could it be something else?
 
 // should I just use string?
 type Code = typeof codeList[number]
-type criteriaTargetFieldContextName = typeof criteriaTargetFieldContextNameList[number]
-type formulaDataType = typeof formulaDataTypeList[number]
+type CriteriaTargetFieldContextName = typeof criteriaTargetFieldContextNameList[number]
+type FormulaDataType = typeof formulaDataTypeList[number]
+type Validity = typeof validityList[number]
 
 type AudienceItem = Value
 type FieldReferenceJoinTrailJoin = Value
@@ -73,10 +75,11 @@ type FieldReference = {
   joinTrail?: JoinTrail
   label?: string
   uniqueId?: string
+  fieldValidityState?: Validity
 }
 
 type FormulaFormula = {
-  dataType?: formulaDataType
+  dataType?: FormulaDataType
   formulaSQL?: string
   id?: string
   label?: Label
@@ -84,19 +87,20 @@ type FormulaFormula = {
 }
 
 type Formula = {
-  fields?: FieldReference[]
+  // eslint-disable-next-line no-use-before-define
+  fields?: FieldOrFormula[]
   formula?: FormulaFormula
 }
 
-type FieldorFormula = {
+export type FieldOrFormula = {
   fieldReference?: FieldReference
   dataSetFormula?: Formula
 }
 
-type Column = {
+export type Column = {
   alias?: string
   columnId?: number
-  field?: FieldorFormula
+  field?: FieldOrFormula
   label?: Label
 }
 type CriteriaExpressionValue = {
@@ -115,7 +119,7 @@ type Operator = {
 }
 
 type CriteriaTargetFieldContext = {
-  name?: criteriaTargetFieldContextName
+  name?: CriteriaTargetFieldContextName
 }
 
 type Meta = {
@@ -126,7 +130,7 @@ type Meta = {
 type Filter = {
   caseSensitive?: boolean
   expressions?: CriteriaExpression[]
-  field?: FieldorFormula
+  field?: FieldOrFormula
   fieldStateName?: string
   meta?: Meta
   operator?: Operator
@@ -138,9 +142,12 @@ type Condition = {
   // eslint-disable-next-line no-use-before-define
   children?: ConditionOrFilter[]
   targetFieldContext?: CriteriaTargetFieldContext
+  meta?: Meta
+  field?: FieldOrFormula
+  fieldStateName?: string
 }
 
-type ConditionOrFilter = {
+export type ConditionOrFilter = {
   condition?: Condition
   filter?: Filter
 }
@@ -236,13 +243,18 @@ export const ParsedDatasetType = (): TypeAndInnerTypes => {
   const datasetFieldReference = createMatchingObjectType<FieldReference>({
     elemID: datasetFieldReferenceElemID,
     annotations: {
-      XML_TYPE_DESCRIBER: '_fieldReference_',
     },
     fields: {
       id: { refType: BuiltinTypes.STRING },
       joinTrail: { refType: datasetJoinTrail },
       label: { refType: BuiltinTypes.STRING },
       uniqueId: { refType: BuiltinTypes.STRING },
+      fieldValidityState: {
+        refType: BuiltinTypes.STRING,
+        annotations: {
+          [CORE_ANNOTATIONS.RESTRICTION]: createRestriction({ values: validityList }),
+        },
+      },
     },
     path: [constants.NETSUITE, constants.TYPES_PATH, constants.DATASET],
   })
@@ -262,7 +274,7 @@ export const ParsedDatasetType = (): TypeAndInnerTypes => {
   const datasetFormulaFormula = createMatchingObjectType<FormulaFormula>({
     elemID: datasetFormulaFormulaElemID,
     annotations: {
-      XML_TYPE_DESCRIBER: '_formula_',
+      XML_TYPE_DESCRIBER: 'formula',
     },
     fields: {
       dataType: {
@@ -283,17 +295,16 @@ export const ParsedDatasetType = (): TypeAndInnerTypes => {
   const datasetFormula = createMatchingObjectType<Formula>({
     elemID: datasetFormulaElemID,
     annotations: {
-      XML_TYPE_DESCRIBER: '_dataSetFormula_',
     },
     fields: {
-      fields: { refType: new ListType(datasetFieldReference) },
+      fields: { refType: BuiltinTypes.UNKNOWN },
       formula: { refType: datasetFormulaFormula },
     },
     path: [constants.NETSUITE, constants.TYPES_PATH, constants.DATASET],
   })
 
   const datasetFieldOrFormulaElemID = new ElemID(constants.NETSUITE, 'dataset_fieldOrFormula')
-  const datasetFieldOrFormula = createMatchingObjectType<FieldorFormula>({
+  const datasetFieldOrFormula = createMatchingObjectType<FieldOrFormula>({
     elemID: datasetFieldOrFormulaElemID,
     annotations: {
       XML_TYPE_DESCRIBER: 'field or formula',
@@ -304,6 +315,7 @@ export const ParsedDatasetType = (): TypeAndInnerTypes => {
     },
     path: [constants.NETSUITE, constants.TYPES_PATH, constants.DATASET],
   })
+  datasetFormula.fields.fields.refType = createRefToElmWithValue(new ListType(datasetFieldOrFormula))
 
   const datasetColumnElemID = new ElemID(constants.NETSUITE, 'dataset_column')
   const datasetColumn = createMatchingObjectType<Column>({
@@ -415,7 +427,6 @@ export const ParsedDatasetType = (): TypeAndInnerTypes => {
   const datasetFilter = createMatchingObjectType<Filter>({
     elemID: datasetFilterElemID,
     annotations: {
-      XML_TYPE_DESCRIBER: 'criteria',
     },
     fields: {
       caseSensitive: { refType: BuiltinTypes.BOOLEAN },
@@ -440,6 +451,9 @@ export const ParsedDatasetType = (): TypeAndInnerTypes => {
       children: { refType: BuiltinTypes.UNKNOWN },
       operator: { refType: datasetOperator },
       targetFieldContext: { refType: datasetTargetFieldContext },
+      meta: { refType: datasetMeta },
+      field: { refType: datasetFieldOrFormula },
+      fieldStateName: { refType: BuiltinTypes.STRING },
     },
     path: [constants.NETSUITE, constants.TYPES_PATH, constants.DATASET],
   })
@@ -459,26 +473,26 @@ export const ParsedDatasetType = (): TypeAndInnerTypes => {
 
   datasetCondition.fields.children.refType = createRefToElmWithValue(new ListType(datasetCriteria))
 
-  innerTypes.name = datasetName
   innerTypes.audience = datasetAudience
-  innerTypes.dependencies = datasetDependencies
   innerTypes.baseRecord = datasetBaseRecord
-  innerTypes.joinTrail = datasetJoinTrail
-  innerTypes.fieldReference = datasetFieldReference
-  innerTypes.fieldorFormula = datasetFieldOrFormula
   innerTypes.column = datasetColumn
-  innerTypes.description = datasetDescription
-  innerTypes.label = datasetLabel
-  innerTypes.formulaFormula = datasetFormulaFormula
-  innerTypes.formula = datasetFormula
-  innerTypes.expressionValue = expressionValue
-  innerTypes.expression = expression
-  innerTypes.criteriaMeta = datasetMeta
-  innerTypes.operator = datasetOperator
-  innerTypes.context = datasetTargetFieldContext
-  innerTypes.criteria = datasetCriteria
-  innerTypes.filter = datasetFilter
   innerTypes.condition = datasetCondition
+  innerTypes.context = datasetTargetFieldContext
+  innerTypes.criteriaMeta = datasetMeta
+  innerTypes.criteria = datasetCriteria
+  innerTypes.dependencies = datasetDependencies
+  innerTypes.description = datasetDescription
+  innerTypes.expression = expression
+  innerTypes.expressionValue = expressionValue
+  innerTypes.fieldOrFormula = datasetFieldOrFormula
+  innerTypes.fieldReference = datasetFieldReference
+  innerTypes.filter = datasetFilter
+  innerTypes.formula = datasetFormula
+  innerTypes.formulaFormula = datasetFormulaFormula
+  innerTypes.joinTrail = datasetJoinTrail
+  innerTypes.label = datasetLabel
+  innerTypes.name = datasetName
+  innerTypes.operator = datasetOperator
 
   const datasetElemID = new ElemID(constants.NETSUITE, 'dataset')
   const dataset = createMatchingObjectType<ParsedDataset>({
@@ -507,14 +521,14 @@ export const ParsedDatasetType = (): TypeAndInnerTypes => {
       columns: { refType: new ListType(datasetColumn) },
       criteria: { refType: datasetCriteria },
       description: { refType: datasetDescription },
-      formulas: { refType: new ListType(datasetFormula) },
+      formulas: { refType: new ListType(datasetFieldOrFormula) },
       id: { refType: BuiltinTypes.UNKNOWN },
       ownerId: { refType: BuiltinTypes.NUMBER },
       version: { refType: BuiltinTypes.STRING },
       scriptId: { refType: BuiltinTypes.UNKNOWN },
     },
     annotations: {
-      XML_TYPE_DESCRIBER: '_dataset_',
+      XML_TYPE_DESCRIBER: 'dataSet',
     },
     path: [constants.NETSUITE, constants.TYPES_PATH, constants.DATASET],
   })
