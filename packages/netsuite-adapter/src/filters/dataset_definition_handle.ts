@@ -16,7 +16,7 @@
 
 /* eslint-disable dot-notation */
 
-import { BuiltinTypes, Change, ElemID, getChangeData, InstanceElement, isInstanceChange, isInstanceElement, isObjectType, ObjectType, ReferenceExpression, Value } from '@salto-io/adapter-api'
+import { BuiltinTypes, Change, ElemID, getChangeData, InstanceElement, isContainerType, isInstanceChange, isInstanceElement, isListType, isObjectType, isPrimitiveType, isReferenceExpression, ObjectType, ReferenceExpression, TypeElement, Value, Values } from '@salto-io/adapter-api'
 import _, { isBoolean, isPlainObject, isString } from 'lodash'
 import { TransformFuncArgs, transformValues, WALK_NEXT_STEP, WalkOnFunc, walkOnValue } from '@salto-io/adapter-utils'
 import { logger } from '@salto-io/logging'
@@ -24,9 +24,8 @@ import { parse } from 'fast-xml-parser'
 import { decode } from 'he'
 import { DATASET, NETSUITE } from '../constants'
 import { LocalFilterCreator } from '../filter'
-import { ParsedDatasetType, XML_TYPE_DESCRIBER } from '../type_parsers/dataset_parsing/parsed_dataset'
+import { ParsedDatasetType } from '../type_parsers/dataset_parsing/parsed_dataset'
 import { ATTRIBUTE_PREFIX } from '../client/constants'
-import { PreDeployParsedDatasetType } from '../type_parsers/dataset_parsing/predeploy_parsed_dataset'
 
 const log = logger(module)
 
@@ -117,84 +116,6 @@ const filterCreator: LocalFilterCreator = () => ({
     // )
     // elements.push(await createDatasetInstances(parsedInstances[4]))
   },
-  preDeploy2: async (changes: Change[]) => {
-    // const addTypeField = (field: TypeElement | undefined, value: Value): Value => {
-    //   if (field !== undefined) {
-    //     if (isListType(field)) {
-    //       return {
-    //         '@_type': 'array',
-    //         _ITEM_: value,
-    //       }
-    //     }
-    //     if (field.elemID.typeName === 'boolean') {
-    //       return {
-    //         '@_type': 'boolean',
-    //         '#text': String(value),
-    //       }
-    //     }
-    //   }
-    //   return value
-    // }
-    const returnToOriginalShape = async (instance: InstanceElement): Promise<void> => {
-      const valueChanges = async ({ value, field, path }: TransformFuncArgs): Promise<Value> => {
-        const fieldType = await field?.getType()
-        let ans = value
-        if (fieldType !== undefined && XML_TYPE_DESCRIBER in fieldType?.annotations) {
-          if (fieldType.annotations[XML_TYPE_DESCRIBER] !== 'formula') {
-            ans = {
-              ...value[Object.keys(value)[0]],
-              _T_: fieldType.annotations[XML_TYPE_DESCRIBER],
-            }
-          } else {
-            ans = {
-              ...value,
-              _T_: fieldType.annotations[XML_TYPE_DESCRIBER],
-            }
-          }
-        }
-        // if (isObjectType(fieldType) && isPlainObject(value)) {
-        //   Object.keys(fieldType.fields).forEach(async key => {
-        //     if (!(key in value)) {
-        //       value[key] = _.pick(addTypeField(await fieldType.fields[key].getType(), undefined))
-        //     }
-        //   })
-        // }
-        // return addTypeField(fieldType, value)
-        log.debug('hello %o, %o, %o', value, field, path)
-        return ans
-      }
-      const definitionValues = {
-        ..._.omit(instance.value, ['scriptid', 'dependencies', 'definition', 'name']),
-      }
-      const values = transformValues({
-        values: definitionValues,
-        type: ParsedDatasetType().type,
-        transformFunc: valueChanges,
-        strict: false,
-        pathID: instance.elemID,
-      })
-      const bla = await values
-      log.debug('adsckjb %o', bla)
-      const wantedType = PreDeployParsedDatasetType()
-      log.debug('acd %o', wantedType)
-      // const bla2 = (bla !== undefined) ? convertToXmlContent({
-      //   typeName: 'root',
-      //   values: bla,
-      // }) : ''
-      // instance.value = {
-      //   name: instance.value.name,
-      //   scriptid: instance.value.scriptid,
-      //   dependencies: instance.value.dependencies,
-      //   definition: bla2,
-      // }
-    }
-
-    changes
-      .filter(isInstanceChange)
-      .map(getChangeData)
-      .filter(instance => instance.elemID.typeName === DATASET)
-      .forEach(returnToOriginalShape)
-  },
   preDeploy: async (changes: Change[]) => {
     const types: Set<string> = new Set([
       'fieldReference',
@@ -203,85 +124,224 @@ const filterCreator: LocalFilterCreator = () => ({
       'filter',
     ])
     const isNumberStr = (str: string): boolean => !Number.isNaN(Number(str))
-    const returnToOriginalShape = async (instance: InstanceElement): Promise<void> => {
-      const walkFunc: WalkOnFunc = ({ value }) => {
-        const checkChanges = (key: string | number): Value => {
-          if (Array.isArray(value[key])) {
+
+    const nullObject = (): { [key: string]: Value } => ({
+      '@_type': 'null',
+    })
+    // const isEmptyObject = (obj: { [key: string]: Value}): boolean =>
+    //   (Object.keys(obj).length === 0)
+
+    // const isNullObject = (obj: { [key: string]: Value}): boolean =>
+    //   (_.isEqual(obj, nullObject()))
+
+    const walkFunc: WalkOnFunc = ({ value }) => {
+      const checkReference = (key: string): Value => {
+        if (key === 'translationScriptId' && isReferenceExpression(value[key])) {
+          const name = value[key].elemID.getFullName()
+          const nameList = name.split('.')
+          if (
+            nameList[0] === NETSUITE
+            && nameList[1] === 'translationcollection'
+            && nameList[2] === 'instance'
+            && nameList[4] === 'strings'
+            && nameList[5] === 'string'
+            && nameList[7] === 'scriptid'
+          ) {
+            return nameList[3].concat('.', nameList[6])
+          }
+          return name
+        }
+        return value[key]
+      }
+
+      const checkTypeField = (key: string | number): Value => {
+        if (Array.isArray(value[key])) {
+          return {
+            '@_type': 'array',
+            _ITEM_: value[key],
+          }
+        }
+        if (isBoolean(value[key])) {
+          // eslint-disable-next-line no-param-reassign
+          return {
+            '@_type': 'boolean',
+            '#text': value[key],
+          }
+        }
+        if (isString(value[key]) && isNumberStr(value[key])) {
+          return {
+            '@_type': 'string',
+            '#text': value[key],
+          }
+        }
+        return value[key]
+      }
+
+      const checkT = (key: string | number): Value => {
+        if (key === 'formula') {
+          return {
+            _T_: 'formula',
+            ...value[key],
+          }
+        }
+        const innerVal = value[key]
+        if (isPlainObject(innerVal)) {
+          const innerkeys = Object.keys(innerVal)
+          if (innerkeys.length === 1 && types.has(innerkeys[0])) {
+            return {
+              _T_: innerkeys[0],
+              ...value[key][innerkeys[0]],
+            }
+          }
+        }
+        return value[key]
+      }
+
+      if (isPlainObject(value)) {
+        const keys = Object.keys(value)
+
+        // check if contains a field with _T_
+        // keys.map(checkT)
+        for (const key of keys) {
+          value[key] = checkT(key)
+          value[key] = checkReference(key)
+        }
+
+        // check if contains a field that supposed to have @_type
+        if (!('@_type' in value)) {
+          // keys.map(checkChanges)
+          for (const key of keys) {
+            value[key] = checkTypeField(key)
+          }
+        }
+      } else if (Array.isArray(value)) {
+        // eslint-disable-next-line no-plusplus
+        for (let i = 0; i < value.length; i++) {
+          value[i] = checkT(i)
+          value[i] = checkTypeField(i)
+        }
+      }
+      return WALK_NEXT_STEP.RECURSE
+    }
+
+    const valueChanges = async ({ value, field, path }: TransformFuncArgs): Promise<Value> => {
+      const createEmptyObjectOfType = async (typeElem: TypeElement): Promise<Value> => {
+        if (isContainerType(typeElem)) {
+          if (isListType(typeElem)) {
             return {
               '@_type': 'array',
-              _ITEM_: value[key],
             }
           }
-          if (isBoolean(value[key])) {
-            // eslint-disable-next-line no-param-reassign
-            return {
-              '@_type': 'boolean',
-              '#text': value[key],
-            }
+          return {
+            '@_type': 'map',
           }
-          if (isString(value[key]) && isNumberStr(value[key])) {
-            return {
-              '@_type': 'string',
-              '#text': value[key],
-            }
-          }
-          return value[key]
         }
-        const checkT = (key: string | number): Value => {
-          if (key === 'formula') {
-            return {
-              _T_: 'formula',
-              ...value[key],
-            }
-          }
-          const innerVal = value[key]
-          if (isPlainObject(innerVal)) {
-            const innerkeys = Object.keys(innerVal)
-            if (innerkeys.length === 1 && types.has(innerkeys[0])) {
-              return {
-                _T_: innerkeys[0],
-                ...value[key][innerkeys[0]],
-              }
-            }
-          }
-          return value[key]
+        if (isPrimitiveType(typeElem)) {
+          return nullObject()
         }
-        if (isPlainObject(value)) {
-          const keys = Object.keys(value)
+        // it must be an object (recursive building the object)
+        const keys = Object.keys(typeElem.fields)
+        const newObject: { [key: string]: Value} = {}
+        for (const key of keys) {
+          if (!(types.has(key))) {
+            // eslint-disable-next-line no-await-in-loop
+            newObject[key] = await createEmptyObjectOfType(await typeElem.fields[key].getType())
+          }
+          // eslint-disable-next-line no-await-in-loop
+        }
+        // Object.keys(typeElem.fields).forEach(async key => {
+        //   newObject[key] = createEmptyObjectOfType(await typeElem.fields[key].getType())
+        // })
 
-          // check if contains a field with _T_
-          // keys.map(checkT)
-          for (const key of keys) {
-            value[key] = checkT(key)
-          }
-
-          // check if contains a field that supposed to have @_type
-          if (!('@_type' in value)) {
-            // keys.map(checkChanges)
-            for (const key of keys) {
-              value[key] = checkChanges(key)
-            }
+        // object that contains only nulls should be null
+        if (Object.keys(newObject).every(key => _.isEqual(newObject[key], nullObject()))) {
+          return nullObject()
+        }
+        return newObject
+      }
+      const fieldType = await field?.getType()
+      if (isObjectType(fieldType) && isPlainObject(value) && !('@_type' in value)) {
+        for (const key of Object.keys(fieldType.fields)) {
+          if (!(key in value) && !(types.has(key))) {
+            // eslint-disable-next-line no-await-in-loop
+            value[key] = await createEmptyObjectOfType(await fieldType.fields[key].getType())
           }
         }
-        if (Array.isArray(value)) {
-          // eslint-disable-next-line no-plusplus
-          for (let i = 0; i < value.length; i++) {
-            value[i] = checkT(i)
-            value[i] = checkChanges(i)
-          }
-        }
-        return WALK_NEXT_STEP.RECURSE
+        // Object.keys(fieldType.fields).forEach(async key => {
+        //   if (!(key in value)) {
+        //     value[key] = createEmptyObjectOfType(await fieldType.fields[key].getType())
+        //   }
+        // })
       }
-      const definitionValues = {
-        ..._.omit(instance.value, ['scriptid', 'dependencies', 'definition', 'name']),
-      }
+      return value
+      log.debug('hello %o, %o, %o', value, field, path)
+    }
+    const matchToOriginalObjectFromXML = (instance: InstanceElement, definitionValues: Values): void =>
       walkOnValue({
         elemId: instance.elemID,
         value: definitionValues,
         func: walkFunc,
       })
+
+    const addMissingFields = (instance: InstanceElement, definitionValues: Values): Promise<Values | undefined> =>
+      transformValues({
+        values: definitionValues,
+        type: ParsedDatasetType().type,
+        transformFunc: valueChanges,
+        strict: false,
+        pathID: instance.elemID,
+      })
+    const returnToOriginalShape = async (instance: InstanceElement): Promise<void> => {
+      const definitionValues = {
+        ..._.omit(instance.value, ['scriptid', 'dependencies', 'definition']),
+      }
+      const fullDefinitionValues = await addMissingFields(instance, definitionValues)
+      if (fullDefinitionValues) {
+        matchToOriginalObjectFromXML(instance, fullDefinitionValues)
+      } else {
+        matchToOriginalObjectFromXML(instance, definitionValues)
+      }
       log.debug('bla %o', instance)
+
+
+      // const valueChanges = async ({ value, field, path }: TransformFuncArgs): Promise<Value> => {
+      //   const fieldType = await field?.getType()
+      //   if (isObjectType(fieldType) && isPlainObject(value)) {
+      //     Object.keys(fieldType.fields).forEach(async key => {
+      //       if (!(key in value)) {
+      //         value[key] = _.pick(addTypeField(await fieldType.fields[key].getType(), undefined))
+      //       }
+      //     })
+      //   }
+      //   return addTypeField(fieldType, value)
+      //   log.debug('hello %o, %o, %o', value, field, path)
+      //   return ans
+      // }
+      // const values = transformValues({
+      //   values: definitionValues,
+      //   type: ParsedDatasetType().type,
+      //   transformFunc: valueChanges,
+      //   strict: false,
+      //   pathID: instance.elemID,
+      // })
+      // const bla = await values
+      // log.debug('adsckjb %o', bla)
+
+      // const returnToOriginalShape = async (instance: InstanceElement): Promise<void> => {
+      //   const bla2 = (bla !== undefined) ? convertToXmlContent({
+      //     typeName: 'root',
+      //     values: bla,
+      //   }) : ''
+      //   instance.value = {
+      //     name: instance.value.name,
+      //     scriptid: instance.value.scriptid,
+      //     dependencies: instance.value.dependencies,
+      //     definition: bla2,
+      //   }
+      // }
     }
+
+
     changes
       .filter(isInstanceChange)
       .map(getChangeData)
