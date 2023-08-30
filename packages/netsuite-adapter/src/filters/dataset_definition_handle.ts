@@ -203,14 +203,14 @@ const addMissingFields = (instance: InstanceElement, definitionValues: Values): 
   })
 const returnToOriginalShape = async (instance: InstanceElement): Promise<Value> => {
   const definitionValues = {
-    ..._.omit(instance.value, ['scriptid', 'dependencies', 'definition', 'name']),
+    ..._.omit(instance.value, ['scriptid', 'dependencies', 'definition']),
   }
   const fullDefinitionValues = await addMissingFields(instance, definitionValues)
   if (fullDefinitionValues) {
     matchToOriginalObjectFromXML(instance, fullDefinitionValues)
     const datasetType = ParsedDatasetType().type
     for (const key of Object.keys(datasetType.fields)) {
-      if (!(key in fullDefinitionValues) && !['scriptid', 'dependencies', 'definition', 'name'].includes(key)) {
+      if (!(key in fullDefinitionValues) && !['scriptid', 'dependencies', 'definition'].includes(key)) {
         // eslint-disable-next-line no-await-in-loop
         fullDefinitionValues[key] = await createEmptyObjectOfType(await datasetType.fields[key].getType())
       }
@@ -219,32 +219,28 @@ const returnToOriginalShape = async (instance: InstanceElement): Promise<Value> 
       _T_: 'dataSet',
       ...fullDefinitionValues,
     }
-    // const nameParts = finalDefinitionObject.name.translationScriptId.split('.')
-    // const finalElemIdPath = [
-    //   elemIdPath[0], elemIdPath[1],
-    //   nameParts[0],
-    //   elemIdPath[2], elemIdPath[3],
-    //   nameParts[1],
-    //   elemIdPath[4],
-    // ]
-    // const name = new ReferenceExpression(new ElemID(NETSUITE, ...finalElemIdPath))
+    const nameParts = finalDefinitionObject.name.translationScriptId.split('.')
+    const finalElemIdPath = [
+      elemIdPath[0], elemIdPath[1],
+      nameParts[0],
+      elemIdPath[2], elemIdPath[3],
+      nameParts[1],
+      elemIdPath[4],
+    ]
+    const name = new ReferenceExpression(new ElemID(NETSUITE, ...finalElemIdPath))
     // eslint-disable-next-line new-cap
     const xmlString = new j2xParser({
       attributeNamePrefix: ATTRIBUTE_PREFIX,
-      // We convert to an not formatted xml since the CDATA transformation is wrong when having format
       format: true,
       ignoreAttributes: false,
       cdataTagName: CDATA_TAG_NAME,
       tagValueProcessor: val => encode(val.toString()),
     }).parse({ root: finalDefinitionObject })
-    const regex = /><\/\w+>/g
-    const newXmlString = xmlString.replace(regex, '/>')
-    log.debug('', newXmlString)
     return {
-      name: instance.value.name,
+      name,
       scriptid: instance.value.scriptid,
       dependencies: instance.value.dependencies,
-      definition: newXmlString,
+      definition: xmlString,
     }
   }
   return instance.value
@@ -311,8 +307,8 @@ const filterCreator: LocalFilterCreator = () => ({
       })
       const finalValue = {
         // ..._.omit(instance.value, 'definition'),
-        ..._.omit(await values, 'name'),
-        ..._.omit(instance.value, 'definition'),
+        ...(await values),
+        ..._.omit(instance.value, 'definition', 'name'),
       }
       instance.value = finalValue
 
