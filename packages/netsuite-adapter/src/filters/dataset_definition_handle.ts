@@ -16,13 +16,13 @@
 
 /* eslint-disable dot-notation */
 
-import { BuiltinTypes, Change, ElemID, getChangeData, InstanceElement, isContainerType, isInstanceChange, isInstanceElement, isListType, isObjectType, isPrimitiveType, isReferenceExpression, ObjectType, ReferenceExpression, TypeElement, Value, Values } from '@salto-io/adapter-api'
+import { BuiltinTypes, ElemID, InstanceElement, isContainerType, isInstanceElement, isListType, isObjectType, isPrimitiveType, isReferenceExpression, ObjectType, ReferenceExpression, TypeElement, Value, Values } from '@salto-io/adapter-api'
 import _, { isBoolean, isPlainObject, isString } from 'lodash'
 import { TransformFuncArgs, transformValues, WALK_NEXT_STEP, WalkOnFunc, walkOnValue } from '@salto-io/adapter-utils'
 import { logger } from '@salto-io/logging'
 import { parse, j2xParser } from 'fast-xml-parser'
 import { decode, encode } from 'he'
-import { DATASET, NETSUITE } from '../constants'
+import { NETSUITE } from '../constants'
 import { LocalFilterCreator } from '../filter'
 import { ParsedDatasetType } from '../type_parsers/dataset_parsing/parsed_dataset'
 import { ATTRIBUTE_PREFIX, CDATA_TAG_NAME } from '../client/constants'
@@ -36,6 +36,11 @@ const types: Set<string> = new Set([
   'filter',
 ])
 
+const notAddingTypes: Set<string> = new Set([
+  ...types,
+  'fieldValidityState',
+])
+
 const elemIdPath = ['translationcollection', 'instance', 'strings', 'string', 'scriptid']
 
 const isNumberStr = (str: string): boolean => !Number.isNaN(Number(str))
@@ -43,6 +48,13 @@ const isNumberStr = (str: string): boolean => !Number.isNaN(Number(str))
 const nullObject = (): { [key: string]: Value } => ({
   '@_type': 'null',
 })
+
+const cloneReportInstance = (instance: InstanceElement, type: ObjectType): InstanceElement =>
+// We create another element not using element.clone because
+// we need the new element to have a parsed save search type.
+  new InstanceElement(instance.elemID.name, type, instance.value,
+    instance.path, instance.annotations)
+
 const createEmptyObjectOfType = async (typeElem: TypeElement): Promise<Value> => {
   if (isContainerType(typeElem)) {
     if (isListType(typeElem)) {
@@ -61,7 +73,7 @@ const createEmptyObjectOfType = async (typeElem: TypeElement): Promise<Value> =>
   const keys = Object.keys(typeElem.fields)
   const newObject: { [key: string]: Value} = {}
   for (const key of keys) {
-    if (!(types.has(key))) {
+    if (!(notAddingTypes.has(key))) {
       // eslint-disable-next-line no-await-in-loop
       newObject[key] = await createEmptyObjectOfType(await typeElem.fields[key].getType())
     }
@@ -177,7 +189,7 @@ const fieldsAdding = async ({ value, field, path }: TransformFuncArgs): Promise<
   const fieldType = await field?.getType()
   if (isObjectType(fieldType) && isPlainObject(value) && !('@_type' in value)) {
     for (const key of Object.keys(fieldType.fields)) {
-      if (!(key in value) && !(types.has(key))) {
+      if (!(key in value) && !(notAddingTypes.has(key))) {
         // eslint-disable-next-line no-await-in-loop
         value[key] = await createEmptyObjectOfType(await fieldType.fields[key].getType())
       }
@@ -208,11 +220,11 @@ const returnToOriginalShape = async (instance: InstanceElement): Promise<Value> 
   const fullDefinitionValues = await addMissingFields(instance, definitionValues)
   if (fullDefinitionValues) {
     matchToOriginalObjectFromXML(instance, fullDefinitionValues)
-    const datasetType = ParsedDatasetType().type
-    for (const key of Object.keys(datasetType.fields)) {
+    const datasetNewType = ParsedDatasetType().type
+    for (const key of Object.keys(datasetNewType.fields)) {
       if (!(key in fullDefinitionValues) && !['scriptid', 'dependencies', 'definition'].includes(key)) {
         // eslint-disable-next-line no-await-in-loop
-        fullDefinitionValues[key] = await createEmptyObjectOfType(await datasetType.fields[key].getType())
+        fullDefinitionValues[key] = await createEmptyObjectOfType(await datasetNewType.fields[key].getType())
       }
     }
     const finalDefinitionObject: { [key: string]: Value} = {
@@ -236,11 +248,15 @@ const returnToOriginalShape = async (instance: InstanceElement): Promise<Value> 
       cdataTagName: CDATA_TAG_NAME,
       tagValueProcessor: val => encode(val.toString()),
     }).parse({ root: finalDefinitionObject })
+    const regex = /><\/\w+>/g
+    const newXmlString = xmlString.replace(regex, '/>')
+    log.debug('', newXmlString)
     return {
       name,
       scriptid: instance.value.scriptid,
       dependencies: instance.value.dependencies,
-      definition: xmlString,
+      definition: newXmlString,
+      nameTranslate: true,
     }
   }
   return instance.value
@@ -249,11 +265,6 @@ const returnToOriginalShape = async (instance: InstanceElement): Promise<Value> 
 const filterCreator: LocalFilterCreator = () => ({
   name: 'parseReportTypes',
   onFetch: async elements => {
-    const cloneReportInstance = (instance: InstanceElement, type: ObjectType): InstanceElement =>
-    // We create another element not using element.clone because
-    // we need the new element to have a parsed save search type.
-      new InstanceElement(instance.elemID.name, type, instance.value,
-        instance.path, instance.annotations)
     const createDatasetInstances = async (instance: InstanceElement): Promise<InstanceElement> => {
       const valueChanges = async ({ value, field }: TransformFuncArgs): Promise<Value> => {
         const fieldType = await field?.getType()
@@ -262,7 +273,10 @@ const filterCreator: LocalFilterCreator = () => ({
             if (value['@_type'] === 'null') {
               return {}
             } if (value['@_type'] === 'array') {
-              return (Array.isArray(value['_ITEM_'])) ? value['_ITEM_'] : [value['_ITEM_']]
+              if (value['_ITEM_'] !== undefined) {
+                return (Array.isArray(value['_ITEM_'])) ? value['_ITEM_'] : [value['_ITEM_']]
+              }
+              return []
             } if (value['@_type'] === 'boolean') {
               return value['#text']
             } if (value['@_type'] === 'string') {
@@ -313,15 +327,16 @@ const filterCreator: LocalFilterCreator = () => ({
       instance.value = finalValue
 
       // eslint-disable-next-line no-void
-      // void returnToOriginalShape(instance)
+      instance.value = await returnToOriginalShape(instance)
+
       return instance
     }
-    const { type, innerTypes } = ParsedDatasetType()
-    _.remove(elements, e => isObjectType(e) && e.elemID.typeName === type.elemID.name)
-    _.remove(elements, e => isObjectType(e) && e.elemID.name.startsWith(type.elemID.name))
+    const { type } = ParsedDatasetType()
+    // _.remove(elements, e => isObjectType(e) && e.elemID.typeName === type.elemID.name)
+    // _.remove(elements, e => isObjectType(e) && e.elemID.name.startsWith(type.elemID.name))
     const instances = _.remove(elements, e => isInstanceElement(e) && e.elemID.typeName === type.elemID.name)
-    elements.push(type)
-    elements.push(...Object.values(innerTypes))
+    // elements.push(type)
+    // elements.push(...Object.values(innerTypes))
     const parsedInstances = (
       instances
         .filter(isInstanceElement)
@@ -335,15 +350,19 @@ const filterCreator: LocalFilterCreator = () => ({
     // )
     // elements.push(await createDatasetInstances(parsedInstances[4]))
   },
-  preDeploy: async (changes: Change[]) => {
-    changes
-      .filter(isInstanceChange)
-      .map(getChangeData)
-      .filter(instance => instance.elemID.typeName === DATASET)
-      .forEach(instance => {
-        instance.value = returnToOriginalShape(instance)
-      })
-  },
+  // preDeploy: async (changes: Change[]) => {
+  //   changes
+  //     .filter(isInstanceChange)
+  //     .map(getChangeData)
+  //     .filter(instance => instance.elemID.typeName === DATASET)
+  //     .forEach(instance => {
+  //       instance.value = returnToOriginalShape(instance)
+  //       instance.refType = new TypeReference(
+  //         new ElemID(NETSUITE, 'dataset'),
+  //         datasetType().type
+  //       )
+  //     })
+  // },
 })
 
 export default filterCreator
