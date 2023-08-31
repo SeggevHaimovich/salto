@@ -46,8 +46,6 @@ type ApplicationId = Value
 type DefinitionId = Value
 type DefinitionScriptId = Value
 
-export const XML_TYPE_DESCRIBER = '_T_'
-
 export type Dependencies = {
   dependency: string[]
 }
@@ -157,11 +155,7 @@ type Description = {
   translationScriptId?: string
 }
 
-type Name = {
-  translationScriptId?: string
-}
-
-export type DatasetDefinitionType = {
+type DatasetDefinitionType = {
   applicationId?: ApplicationId
   audience?: Audience
   baseRecord?: BaseRecord
@@ -170,7 +164,6 @@ export type DatasetDefinitionType = {
   description?: Description
   formulas?: Formula[]
   id?: DefinitionId
-  name?: Name
   ownerId?: number
   scriptId?: DefinitionScriptId
   version?: string
@@ -178,6 +171,7 @@ export type DatasetDefinitionType = {
 
 export type ParsedDataset = {
   scriptid: string
+  name: string
   dependencies?: {
     dependency?: string[]
   }
@@ -276,7 +270,6 @@ export const ParsedDatasetType = (): TypeAndInnerTypes => {
   const datasetFormulaFormula = createMatchingObjectType<FormulaFormula>({
     elemID: datasetFormulaFormulaElemID,
     annotations: {
-      XML_TYPE_DESCRIBER: 'formula',
     },
     fields: {
       dataType: {
@@ -309,7 +302,6 @@ export const ParsedDatasetType = (): TypeAndInnerTypes => {
   const datasetFieldOrFormula = createMatchingObjectType<FieldOrFormula>({
     elemID: datasetFieldOrFormulaElemID,
     annotations: {
-      XML_TYPE_DESCRIBER: 'field or formula',
     },
     fields: {
       fieldReference: { refType: datasetFieldReference },
@@ -464,7 +456,6 @@ export const ParsedDatasetType = (): TypeAndInnerTypes => {
   const datasetCriteria = createMatchingObjectType<ConditionOrFilter>({
     elemID: datasetCriteriaElemID,
     annotations: {
-      XML_TYPE_DESCRIBER: 'criteria',
     },
     fields: {
       condition: { refType: datasetCondition },
@@ -508,10 +499,10 @@ export const ParsedDatasetType = (): TypeAndInnerTypes => {
         },
       },
       name: {
-        refType: createRefToElmWithValue(BuiltinTypes.STRING /* Original type was single-select list */),
+        refType: createRefToElmWithValue(BuiltinTypes.STRING),
         annotations: {
-          [CORE_ANNOTATIONS.REQUIRED]: true,
-          // [CORE_ANNOTATIONS.RESTRICTION]: createRestriction({ max_length: 50 }),
+          _required: true,
+          [CORE_ANNOTATIONS.RESTRICTION]: createRestriction({ max_length: 50 }),
         },
       },
       dependencies: { refType: datasetDependencies },
@@ -529,7 +520,6 @@ export const ParsedDatasetType = (): TypeAndInnerTypes => {
       scriptId: { refType: BuiltinTypes.UNKNOWN },
     },
     annotations: {
-      XML_TYPE_DESCRIBER: 'dataSet',
     },
     path: [constants.NETSUITE, constants.TYPES_PATH, constants.DATASET],
   })
