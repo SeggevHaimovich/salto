@@ -17,6 +17,7 @@ import { BuiltinTypes, CORE_ANNOTATIONS, ElemID, ObjectType, createRestriction, 
 import { createMatchingObjectType } from '@salto-io/adapter-utils'
 import { TypeAndInnerTypes } from '../../types/object_types'
 import * as constants from '../../constants'
+import { fieldTypes } from '../../types/field_types'
 
 // can't deploy ownerId - do strange thing (change and stay after fetch, doesn't change the owner in the UI)
 
@@ -180,6 +181,7 @@ export type ParsedDataset = {
   dependencies?: {
     dependency?: string[]
   }
+  definition?: string
 } & DatasetDefinitionType
 
 export const ParsedDatasetType = (): TypeAndInnerTypes => {
@@ -342,16 +344,16 @@ export const ParsedDatasetType = (): TypeAndInnerTypes => {
     path: [constants.NETSUITE, constants.TYPES_PATH, constants.DATASET],
   })
 
-  const datasetNameElemID = new ElemID(constants.NETSUITE, 'dataset_name') // not sure
-  const datasetName = createMatchingObjectType<Name>({
-    elemID: datasetNameElemID,
-    annotations: {
-    },
-    fields: {
-      translationScriptId: { refType: BuiltinTypes.STRING },
-    },
-    path: [constants.NETSUITE, constants.TYPES_PATH, constants.DATASET],
-  })
+  // const datasetNameElemID = new ElemID(constants.NETSUITE, 'dataset_name')
+  // const datasetName = createMatchingObjectType<Name>({
+  //   elemID: datasetNameElemID,
+  //   annotations: {
+  //   },
+  //   fields: {
+  //     translationScriptId: { refType: BuiltinTypes.STRING },
+  //   },
+  //   path: [constants.NETSUITE, constants.TYPES_PATH, constants.DATASET],
+  // })
 
   const expressionValueElemID = new ElemID(constants.NETSUITE, 'dataset_criteria_expression_value')
   const expressionValue = createMatchingObjectType<CriteriaExpressionValue>({
@@ -491,7 +493,6 @@ export const ParsedDatasetType = (): TypeAndInnerTypes => {
   innerTypes.formulaFormula = datasetFormulaFormula
   innerTypes.joinTrail = datasetJoinTrail
   innerTypes.label = datasetLabel
-  innerTypes.name = datasetName
   innerTypes.operator = datasetOperator
 
   const datasetElemID = new ElemID(constants.NETSUITE, 'dataset')
@@ -507,14 +508,14 @@ export const ParsedDatasetType = (): TypeAndInnerTypes => {
         },
       },
       name: {
-        refType: datasetName,
-        // refType: createRefToElmWithValue(BuiltinTypes.STRING),
-        // annotations: {
-        //   [CORE_ANNOTATIONS.REQUIRED]: true,
-        //   // [constants.IS_ATTRIBUTE]: true,
-        // },
+        refType: createRefToElmWithValue(BuiltinTypes.STRING /* Original type was single-select list */),
+        annotations: {
+          [CORE_ANNOTATIONS.REQUIRED]: true,
+          // [CORE_ANNOTATIONS.RESTRICTION]: createRestriction({ max_length: 50 }),
+        },
       },
       dependencies: { refType: datasetDependencies },
+      definition: { refType: createRefToElmWithValue(fieldTypes.cdata) },
       applicationId: { refType: BuiltinTypes.UNKNOWN },
       audience: { refType: datasetAudience },
       baseRecord: { refType: datasetBaseRecord },

@@ -16,13 +16,13 @@
 
 /* eslint-disable dot-notation */
 
-import { BuiltinTypes, Change, ElemID, getChangeData, InstanceElement, isContainerType, isInstanceChange, isInstanceElement, isListType, isObjectType, isPrimitiveType, isReferenceExpression, ObjectType, ReferenceExpression, TypeElement, Value, Values } from '@salto-io/adapter-api'
+import { BuiltinTypes, ElemID, InstanceElement, isContainerType, isInstanceElement, isListType, isObjectType, isPrimitiveType, isReferenceExpression, ObjectType, ReferenceExpression, TypeElement, Value, Values } from '@salto-io/adapter-api'
 import _, { isBoolean, isPlainObject, isString } from 'lodash'
 import { TransformFuncArgs, transformValues, WALK_NEXT_STEP, WalkOnFunc, walkOnValue } from '@salto-io/adapter-utils'
 import { logger } from '@salto-io/logging'
 import { parse, j2xParser } from 'fast-xml-parser'
 import { decode, encode } from 'he'
-import { DATASET, NETSUITE } from '../constants'
+import { NETSUITE } from '../constants'
 import { LocalFilterCreator } from '../filter'
 import { ParsedDatasetType } from '../type_parsers/dataset_parsing/parsed_dataset'
 import { ATTRIBUTE_PREFIX, CDATA_TAG_NAME } from '../client/constants'
@@ -243,6 +243,7 @@ const returnToOriginalShape = async (instance: InstanceElement): Promise<Value> 
       scriptid: instance.value.scriptid,
       dependencies: instance.value.dependencies,
       definition: newXmlString,
+      nameTranslate: true,
     }
   }
   return instance.value
@@ -311,16 +312,12 @@ const filterCreator: LocalFilterCreator = () => ({
       }
       instance.value = finalValue
 
-      // instance.value = await returnToOriginalShape(instance)
+      instance.value = await returnToOriginalShape(instance)
 
       return instance
     }
-    const { type, innerTypes } = ParsedDatasetType()
-    _.remove(elements, e => isObjectType(e) && e.elemID.typeName === type.elemID.name)
-    _.remove(elements, e => isObjectType(e) && e.elemID.name.startsWith(type.elemID.name))
+    const { type } = ParsedDatasetType()
     const instances = _.remove(elements, e => isInstanceElement(e) && e.elemID.typeName === type.elemID.name)
-    elements.push(type)
-    elements.push(...Object.values(innerTypes))
     const parsedInstances = (
       instances
         .filter(isInstanceElement)
@@ -333,22 +330,6 @@ const filterCreator: LocalFilterCreator = () => ({
     //     .map(instance => cloneReportInstance(instance, type))
     // )
     // elements.push(await createDatasetInstances(parsedInstances[4]))
-  },
-  preDeploy: async (changes: Change[]) => {
-    for (const change of changes) {
-      if (isInstanceChange(change)) {
-        const instance = getChangeData(change)
-        if (instance.elemID.typeName === DATASET) {
-          // eslint-disable-next-line no-await-in-loop
-          instance.value = await returnToOriginalShape(instance)
-          // instance.refType = new TypeReference(
-          //   new ElemID(NETSUITE, 'dataset'),
-          //   datasetType().type
-          // )
-          log.debug('')
-        }
-      }
-    }
   },
 })
 
