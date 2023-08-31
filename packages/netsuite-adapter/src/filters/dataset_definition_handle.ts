@@ -223,8 +223,12 @@ const returnToOriginalShape = async (instance: InstanceElement): Promise<Value> 
         fullDefinitionValues[key] = await createEmptyObjectOfType(await datasetNewType.fields[key].getType())
       }
     }
+    const name = instance.value.name['#text'].elemID.getFullName().split('.')
     const finalDefinitionObject: { [key: string]: Value} = {
       _T_: 'dataSet',
+      name: {
+        translationScriptId: name[3].concat('.', name[6]),
+      },
       ...fullDefinitionValues,
     }
     // eslint-disable-next-line new-cap
