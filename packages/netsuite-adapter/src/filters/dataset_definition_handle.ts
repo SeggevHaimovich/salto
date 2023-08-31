@@ -16,7 +16,7 @@
 
 /* eslint-disable dot-notation */
 
-import { BuiltinTypes, Change, ElemID, getChangeData, InstanceElement, isContainerType, isInstanceChange, isInstanceElement, isListType, isObjectType, isPrimitiveType, isReferenceExpression, ObjectType, ReferenceExpression, TypeElement, Value, Values } from '@salto-io/adapter-api'
+import { BuiltinTypes, Change, ElemID, getChangeData, InstanceElement, isContainerType, isInstanceChange, isInstanceElement, isObjectType, isPrimitiveType, isReferenceExpression, ObjectType, ReferenceExpression, TypeElement, Value, Values } from '@salto-io/adapter-api'
 import _, { isBoolean, isPlainObject, isString } from 'lodash'
 import { TransformFuncArgs, transformValues, WALK_NEXT_STEP, WalkOnFunc, walkOnValue } from '@salto-io/adapter-utils'
 import { logger } from '@salto-io/logging'
@@ -57,13 +57,9 @@ const cloneReportInstance = (instance: InstanceElement, type: ObjectType): Insta
 
 const createEmptyObjectOfType = async (typeElem: TypeElement): Promise<Value> => {
   if (isContainerType(typeElem)) {
-    if (isListType(typeElem)) {
-      return {
-        '@_type': 'array',
-      }
-    }
+    // we only have lists in the type
     return {
-      '@_type': 'map',
+      '@_type': 'array',
     }
   }
   if (isPrimitiveType(typeElem)) {
@@ -85,11 +81,6 @@ const createEmptyObjectOfType = async (typeElem: TypeElement): Promise<Value> =>
   }
   return newObject
 }
-// const isEmptyObject = (obj: { [key: string]: Value}): boolean =>
-//   (Object.keys(obj).length === 0)
-
-// const isNullObject = (obj: { [key: string]: Value}): boolean =>
-//   (_.isEqual(obj, nullObject()))
 
 const walkFunc: WalkOnFunc = ({ value }) => {
   const checkReference = (key: string): Value => {
@@ -98,11 +89,11 @@ const walkFunc: WalkOnFunc = ({ value }) => {
       const nameList = name.split('.')
       if (
         nameList[0] === NETSUITE
-        && nameList[1] === 'translationcollection'
-        && nameList[2] === 'instance'
-        && nameList[4] === 'strings'
-        && nameList[5] === 'string'
-        && nameList[7] === 'scriptid'
+        && nameList[1] === elemIdPath[0]
+        && nameList[2] === elemIdPath[1]
+        && nameList[4] === elemIdPath[2]
+        && nameList[5] === elemIdPath[3]
+        && nameList[7] === elemIdPath[4]
       ) {
         return nameList[3].concat('.', nameList[6])
       }
@@ -315,8 +306,6 @@ const filterCreator: LocalFilterCreator = () => ({
       }
       instance.value = finalValue
 
-      // instance.value = await returnToOriginalShape(instance)
-
       return instance
     }
     const { type, innerTypes } = ParsedDatasetType()
@@ -331,12 +320,6 @@ const filterCreator: LocalFilterCreator = () => ({
         .map(instance => cloneReportInstance(instance, type))
     ).map(createDatasetInstances)
     elements.push(...await Promise.all(parsedInstances))
-    // const parsedInstances = (
-    //   instances
-    //     .filter(isInstanceElement)
-    //     .map(instance => cloneReportInstance(instance, type))
-    // )
-    // elements.push(await createDatasetInstances(parsedInstances[4]))
   },
   preDeploy: async (changes: Change[]) => {
     for (const change of changes) {
@@ -345,10 +328,6 @@ const filterCreator: LocalFilterCreator = () => ({
         if (instance.elemID.typeName === DATASET) {
           // eslint-disable-next-line no-await-in-loop
           instance.value = await returnToOriginalShape(instance)
-          // instance.refType = new TypeReference(
-          //   new ElemID(NETSUITE, 'dataset'),
-          //   datasetType().type
-          // )
           log.debug('')
         }
       }
