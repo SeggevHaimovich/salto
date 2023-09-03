@@ -14,40 +14,47 @@
 * limitations under the License.
 */
 
-/* eslint-disable dot-notation */
-
 import { BuiltinTypes, Change, ElemID, getChangeData, InstanceElement, isContainerType, isInstanceChange, isInstanceElement, isObjectType, isPrimitiveType, isReferenceExpression, ObjectType, ReferenceExpression, TypeElement, Value, Values } from '@salto-io/adapter-api'
 import _, { isBoolean, isPlainObject, isString } from 'lodash'
 import { TransformFuncArgs, transformValues, WALK_NEXT_STEP, WalkOnFunc, walkOnValue } from '@salto-io/adapter-utils'
 import { parse, j2xParser } from 'fast-xml-parser'
 import { decode, encode } from 'he'
 import { collections } from '@salto-io/lowerdash'
+// import { logger } from '@salto-io/logging'
 import { DATASET, NETSUITE } from '../constants'
 import { LocalFilterCreator } from '../filter'
 import { ParsedDatasetType } from '../type_parsers/dataset_parsing/parsed_dataset'
 import { ATTRIBUTE_PREFIX, CDATA_TAG_NAME } from '../client/constants'
 
+// const log = logger(module)
+
 const { awu } = collections.asynciterable
 
-const fieldsWithT: Set<string> = new Set([
+const T = '_T_'
+const TYPE = '@_type'
+const ITEM = '_ITEM_'
+const TEXT = '#text'
+
+const fieldsWithT = new Set([
   'fieldReference',
   'dataSetFormula',
   'condition',
   'filter',
 ])
 
-const notAddingFields: Set<string> = new Set([
+const notAddingFields = new Set([
   ...fieldsWithT,
   'fieldValidityState',
 ])
 
-const elemIdPath = ['translationcollection', 'instance', 'strings', 'string', 'scriptid']
+const originalFields = [
+  'scriptid',
+  'dependencies',
+  'definition',
+  'name',
+]
 
 const isNumberStr = (str: string): boolean => !Number.isNaN(Number(str))
-
-const nullObject = (): { [key: string]: Value } => ({
-  '@_type': 'null',
-})
 
 const cloneReportInstance = (instance: InstanceElement, type: ObjectType): InstanceElement =>
 // We create another element not using element.clone because
@@ -58,37 +65,33 @@ const cloneReportInstance = (instance: InstanceElement, type: ObjectType): Insta
 const fetchTransformFunc = async ({ value, field }: TransformFuncArgs): Promise<Value> => {
   const fieldType = await field?.getType()
   if (_.isPlainObject(value)) {
-    if ('@_type' in value) {
-      if (value['@_type'] === 'null') {
+    if (TYPE in value) {
+      if (value[TYPE] === 'null') {
         return {}
-      } if (value['@_type'] === 'array') {
-        if (value['_ITEM_'] !== undefined) {
-          return (Array.isArray(value['_ITEM_'])) ? value['_ITEM_'] : [value['_ITEM_']]
+      } if (value[TYPE] === 'array') {
+        if (value[ITEM] !== undefined) {
+          return (Array.isArray(value[ITEM])) ? value[ITEM] : [value[ITEM]]
         }
         return []
-      } if (value['@_type'] === 'boolean') {
-        return value['#text']
-      } if (value['@_type'] === 'string') {
-        return String(value['#text'])
+      } if (value[TYPE] === 'boolean') {
+        return value[TEXT]
+      } if (value[TYPE] === 'string') {
+        return String(value[TEXT])
       }
     }
-    if ('_T_' in value) {
-      return (value['_T_'] !== 'dataSet' && value['_T_'] !== 'formula') ? {
-        [value['_T_']]: _.omit(value, '_T_'),
-      } : _.omit(value, '_T_')
+    if (T in value) {
+      return (value[T] !== 'dataSet' && value[T] !== 'formula') ? {
+        [value[T]]: _.omit(value, T),
+      } : _.omit(value, T)
     }
     return value
   }
   if (isString(value) && value.startsWith('custcollectiontranslations')) {
     const nameParts = value.split('.')
-    const finalElemIdPath = [
-      elemIdPath[0], elemIdPath[1],
-      nameParts[0],
-      elemIdPath[2], elemIdPath[3],
-      nameParts[1],
-      elemIdPath[4],
-    ]
-    return new ReferenceExpression(new ElemID(NETSUITE, ...finalElemIdPath))
+    if (nameParts.length === 2) {
+      const finalElemIdPath = `translationcollection.instance.${nameParts[0]}.strings.string.${nameParts[1]}.scriptid`
+      return new ReferenceExpression(new ElemID(NETSUITE, finalElemIdPath))
+    }
   }
   if (fieldType?.elemID.isEqual(BuiltinTypes.STRING.elemID)) {
     return String(value)
@@ -122,12 +125,16 @@ const createEmptyObjectOfType = async (typeElem: TypeElement): Promise<Value> =>
   if (isContainerType(typeElem)) {
     // we only have lists in the type
     return {
-      '@_type': 'array',
+      [TYPE]: 'array',
     }
   }
 
+  const nullObject = {
+    [TYPE]: 'null',
+  }
+
   if (isPrimitiveType(typeElem)) {
-    return nullObject()
+    return nullObject
   }
 
   // it must be an object (recursive building the object)
@@ -140,23 +147,15 @@ const createEmptyObjectOfType = async (typeElem: TypeElement): Promise<Value> =>
     })
 
   // object that contains only nulls should be null
-  if (Object.keys(newObject).every(key => _.isEqual(newObject[key], nullObject()))) {
-    return nullObject()
+  if (Object.keys(newObject).every(key => _.isEqual(newObject[key], nullObject))) {
+    return nullObject
   }
   return newObject
 }
 
 const checkReferenceToTranslation = (name: string): boolean => {
-  const nameList = name.split('.')
-  return (nameList.length === 8)
-  && (
-    nameList[0] === NETSUITE
-    && nameList[1] === elemIdPath[0]
-    && nameList[2] === elemIdPath[1]
-    && nameList[4] === elemIdPath[2]
-    && nameList[5] === elemIdPath[3]
-    && nameList[7] === elemIdPath[4]
-  )
+  const regex = /^netsuite.translationcollection.instance.\w+.strings.string.\w+.scriptid$/
+  return regex.test(name)
 }
 const deployWalkFunc: WalkOnFunc = ({ value }) => {
   const checkReference = (key: string): Value => {
@@ -174,21 +173,21 @@ const deployWalkFunc: WalkOnFunc = ({ value }) => {
   const checkTypeField = (key: string | number): Value => {
     if (Array.isArray(value[key])) {
       return {
-        '@_type': 'array',
-        _ITEM_: value[key],
+        [TYPE]: 'array',
+        [ITEM]: value[key],
       }
     }
     if (isBoolean(value[key])) {
       // eslint-disable-next-line no-param-reassign
       return {
-        '@_type': 'boolean',
-        '#text': String(value[key]),
+        [TYPE]: 'boolean',
+        [TEXT]: String(value[key]),
       }
     }
     if (isString(value[key]) && isNumberStr(value[key])) {
       return {
-        '@_type': 'string',
-        '#text': String(value[key]),
+        [TYPE]: 'string',
+        [TEXT]: String(value[key]),
       }
     }
     return value[key]
@@ -222,7 +221,7 @@ const deployWalkFunc: WalkOnFunc = ({ value }) => {
       value[key] = checkReference(key)
     })
 
-    if (!('@_type' in value)) {
+    if (!(TYPE in value)) {
       keys.forEach(key => {
         value[key] = checkTypeField(key)
       })
@@ -236,8 +235,8 @@ const deployWalkFunc: WalkOnFunc = ({ value }) => {
   return WALK_NEXT_STEP.RECURSE
 }
 
-const deployTransformFunc = async ({ value, field }: TransformFuncArgs): Promise<Value> => {
-  const fieldType = await field?.getType()
+const deployTransformFunc = async ({ value, field, path }: TransformFuncArgs): Promise<Value> => {
+  const fieldType = (path?.getFullName().split('.').length === 4) ? ParsedDatasetType().type : await field?.getType()
   if (isObjectType(fieldType) && isPlainObject(value) && !('@_type' in value)) {
     await awu(Object.keys(fieldType.fields))
       .filter(key => !(key in value) && !(notAddingFields.has(key)))
@@ -247,7 +246,7 @@ const deployTransformFunc = async ({ value, field }: TransformFuncArgs): Promise
   }
   return value
 }
-const matchToOriginalObjectFromXML = (instance: InstanceElement, definitionValues: Values): void =>
+const matchToXmlObjectForm = (instance: InstanceElement, definitionValues: Values): void =>
   walkOnValue({
     elemId: instance.elemID,
     value: definitionValues,
@@ -264,28 +263,21 @@ const addMissingFields = (instance: InstanceElement, definitionValues: Values): 
   })
 const returnToOriginalShape = async (instance: InstanceElement): Promise<Value> => {
   const definitionValues = {
-    ..._.omit(instance.value, ['scriptid', 'dependencies', 'definition', 'name']),
+    ..._.omit(instance.value, originalFields),
   }
   const fullDefinitionValues = await addMissingFields(instance, definitionValues)
   if (fullDefinitionValues) {
-    matchToOriginalObjectFromXML(instance, fullDefinitionValues)
-
-    // add fields to dataset high level
-    const datasetNewType = ParsedDatasetType().type
-    await awu(Object.keys(datasetNewType.fields))
-      .filter(key => !(key in fullDefinitionValues) && !['scriptid', 'dependencies', 'definition', 'name'].includes(key))
-      .forEach(async key => {
-        fullDefinitionValues[key] = await createEmptyObjectOfType(await datasetNewType.fields[key].getType())
-      })
-    fullDefinitionValues['_T_'] = 'dataset'
-    const name = instance.value.name['#text']?.elemID.getFullName()
-    if (name !== undefined && checkReferenceToTranslation(name)) {
-      const nameList = name.split('.')
-      fullDefinitionValues.name = {
-        translationScriptId: nameList[3].concat('.', nameList[6]),
+    matchToXmlObjectForm(instance, fullDefinitionValues)
+    fullDefinitionValues[T] = 'dataSet'
+    fullDefinitionValues.name = instance.value.name
+    if (isReferenceExpression(instance.value.name?.[TEXT])) {
+      const name = instance.value.name[TEXT].elemID.getFullName()
+      if (name !== undefined && checkReferenceToTranslation(name)) {
+        const nameList = name.split('.')
+        fullDefinitionValues.name = {
+          translationScriptId: nameList[3].concat('.', nameList[6]),
+        }
       }
-    } else {
-      fullDefinitionValues.name = instance.value.name
     }
 
     // eslint-disable-next-line new-cap
@@ -307,7 +299,7 @@ const returnToOriginalShape = async (instance: InstanceElement): Promise<Value> 
 }
 
 const filterCreator: LocalFilterCreator = () => ({
-  name: 'parseReportTypes',
+  name: 'parseDataset',
   onFetch: async elements => {
     const { type, innerTypes } = ParsedDatasetType()
     _.remove(elements, e => isObjectType(e) && e.elemID.typeName === type.elemID.name)
@@ -315,11 +307,6 @@ const filterCreator: LocalFilterCreator = () => ({
     const instances = _.remove(elements, e => isInstanceElement(e) && e.elemID.typeName === type.elemID.name)
     elements.push(type)
     elements.push(...Object.values(innerTypes))
-    // instances
-    //   .filter(isInstanceElement)
-    //   .map(instance => cloneReportInstance(instance, type))
-    //   .map(createDatasetInstances)
-    // elements.push(...instances) // why doesn't it work?
     const parsedInstances = (
       instances
         .filter(isInstanceElement)
