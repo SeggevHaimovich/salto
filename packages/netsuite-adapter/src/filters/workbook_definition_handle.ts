@@ -20,13 +20,13 @@ import { TransformFuncArgs, transformValues, WALK_NEXT_STEP, WalkOnFunc, walkOnV
 import { parse, j2xParser } from 'fast-xml-parser'
 import { decode, encode } from 'he'
 import { collections } from '@salto-io/lowerdash'
-// import { logger } from '@salto-io/logging'
+import { logger } from '@salto-io/logging'
 import { DATASET, NETSUITE } from '../constants'
 import { LocalFilterCreator } from '../filter'
 import { ParsedDatasetType } from '../type_parsers/dataset_parsing/parsed_dataset'
 import { ATTRIBUTE_PREFIX, CDATA_TAG_NAME } from '../client/constants'
 
-// const log = logger(module)
+const log = logger(module)
 
 const { awu } = collections.asynciterable
 
@@ -301,18 +301,38 @@ const returnToOriginalShape = async (instance: InstanceElement): Promise<Value> 
 const filterCreator: LocalFilterCreator = () => ({
   name: 'parseDataset',
   onFetch: async elements => {
-    const { type, innerTypes } = ParsedDatasetType()
-    _.remove(elements, e => isObjectType(e) && e.elemID.typeName === type.elemID.name)
-    _.remove(elements, e => isObjectType(e) && e.elemID.name.startsWith(type.elemID.name))
-    const instances = _.remove(elements, e => isInstanceElement(e) && e.elemID.typeName === type.elemID.name)
-    elements.push(type)
-    elements.push(...Object.values(innerTypes))
-    const parsedInstances = await awu(instances)
-      .filter(isInstanceElement)
-      .map(instance => cloneReportInstance(instance, type))
-      .map(createDatasetInstances)
-      .toArray()
-    elements.push(...parsedInstances)
+    for (const element of elements) {
+      if (isInstanceElement(element) && element.elemID.typeName === 'workbook') {
+        const definitionValues = parse(element.value.definition, {
+          attributeNamePrefix: ATTRIBUTE_PREFIX,
+          ignoreAttributes: false,
+          tagValueProcessor: val => decode(val),
+        })
+        const chartDefinitionString = definitionValues.root.charts?.[ITEM]?.[0]?.definition
+        if (chartDefinitionString) {
+          const chartDefinition = parse(chartDefinitionString, {
+            attributeNamePrefix: ATTRIBUTE_PREFIX,
+            ignoreAttributes: false,
+            tagValueProcessor: val => decode(val),
+          })
+          log.debug('', chartDefinition)
+        }
+        log.debug('', definitionValues)
+      }
+    }
+    log.debug('', cloneReportInstance, createDatasetInstances)
+    // const { type, innerTypes } = ParsedDatasetType()
+    // _.remove(elements, e => isObjectType(e) && e.elemID.typeName === type.elemID.name)
+    // _.remove(elements, e => isObjectType(e) && e.elemID.name.startsWith(type.elemID.name))
+    // const instances = _.remove(elements, e => isInstanceElement(e) && e.elemID.typeName === type.elemID.name)
+    // elements.push(type)
+    // elements.push(...Object.values(innerTypes))
+    // const parsedInstances = (
+    //   instances
+    //     .filter(isInstanceElement)
+    //     .map(instance => cloneReportInstance(instance, type))
+    //     .map(createDatasetInstances))
+    // elements.push(...await Promise.all(parsedInstances))
   },
   preDeploy: async (changes: Change[]) => {
     await awu(changes)

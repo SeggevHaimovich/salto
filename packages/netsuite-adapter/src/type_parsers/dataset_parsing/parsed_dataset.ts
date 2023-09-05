@@ -22,54 +22,54 @@ import { fieldTypes } from '../../types/field_types'
 // can't deploy ownerId - do strange thing (change and stay after fetch, doesn't change the owner in the UI)
 
 // TODO add all the options to all
-const codeList = ['AND', 'OR',
+export const codeList = ['AND', 'OR',
   'ANY_OF',
   'EMPTY', 'EMPTY_NOT', 'CONTAIN', 'CONTAIN_NOT', 'ENDWITH', 'ENDWITH_NOT', 'IS', 'IS_NOT', 'START_WITH', 'START_WITH_NOT',
   'LESS', 'GREATER', 'EQUAL', 'EQUAL_NOT', 'GREATER_OR_EQUAL', 'LESS_OR_EQUAL', 'BETWEEN', 'BETWEEN_NOT'] as const
-const criteriaTargetFieldContextNameList = ['DEFAULT', 'IDENTIFIER', 'UNCONSOLIDATED'] as const
-const formulaDataTypeList = ['INTEGER', 'BOOLEAN', 'DATE', 'DATETIME', 'FLOAT', 'STRING', 'CLOBTEXT', 'PERCENT', 'DURATION'] as const
-const validityList = ['VALID'] // ????? could it be something else?
+const targetFieldContextNameList = ['DEFAULT', 'IDENTIFIER', 'UNCONSOLIDATED'] as const
+export const formulaDataTypeList = ['INTEGER', 'BOOLEAN', 'DATE', 'DATETIME', 'FLOAT', 'STRING', 'CLOBTEXT', 'PERCENT', 'DURATION'] as const
+export const validityList = ['VALID'] // ????? could it be something else?
 
 // should I just use string?
 type Code = typeof codeList[number]
-type CriteriaTargetFieldContextName = typeof criteriaTargetFieldContextNameList[number]
+type TargetFieldContextName = typeof targetFieldContextNameList[number]
 type FormulaDataType = typeof formulaDataTypeList[number]
 type Validity = typeof validityList[number]
 
 type AudienceItem = Value
 type FieldReferenceJoinTrailJoin = Value
-type CriteriaExpressionSubType = Value
-type CriteriaExpressionUiData = Value
+type ExpressionSubType = Value
+type ExpressionUiData = Value
 
 // maybe we should ignore these values
-type ApplicationId = Value
-type DefinitionId = Value
-type DefinitionScriptId = Value
+export type ApplicationId = Value
+export type DefinitionId = Value
+export type DefinitionScriptId = Value
 
 export type Dependencies = {
   dependency: string[]
 }
 
-type Audience = {
+export type Audience = {
   AudienceItems?: AudienceItem[]
   isPublic?: boolean
 }
 
-type BaseRecord = {
+export type BaseRecord = {
   id?: string
   label?: string
 }
 
-type Label = {
+export type TranslationType = {
   translationScriptId?: string
 }
 
-type JoinTrail = {
+export type JoinTrail = {
   baseRecord?: BaseRecord
   joins?: FieldReferenceJoinTrailJoin[]
 }
 
-type FieldReference = {
+export type FieldReference = {
   id?: string
   joinTrail?: JoinTrail
   label?: string
@@ -77,15 +77,15 @@ type FieldReference = {
   fieldValidityState?: Validity
 }
 
-type FormulaFormula = {
+export type FormulaFormula = {
   dataType?: FormulaDataType
   formulaSQL?: string
   id?: string
-  label?: Label
+  label?: TranslationType
   uniqueId?: string
 }
 
-type Formula = {
+export type Formula = {
   // eslint-disable-next-line no-use-before-define
   fields?: FieldOrFormula[]
   formula?: FormulaFormula
@@ -100,59 +100,56 @@ export type Column = {
   alias?: string
   columnId?: number
   field?: FieldOrFormula
-  label?: Label
+  label?: TranslationType
 }
-type CriteriaExpressionValue = {
+export type ExpressionValue = {
   type?: string
-  value?: string
-}
-type CriteriaExpression = {
-  label?: string
-  subType?: CriteriaExpressionSubType
-  uiData?: CriteriaExpressionUiData[]
-  value?: CriteriaExpressionValue
+  value?: string // is it really string or is it unknown?
 }
 
-type Operator = {
+export type Expression = {
+  label?: string
+  subType?: ExpressionSubType
+  uiData?: ExpressionUiData[]
+  value?: ExpressionValue
+}
+
+export type Operator = {
   code?: Code
 }
 
-type CriteriaTargetFieldContext = {
-  name?: CriteriaTargetFieldContextName
+type TargetFieldContext = {
+  name?: TargetFieldContextName
 }
 
-type Meta = {
+export type Meta = {
   selectorType?: string
   subType?: string
 }
 
-type Filter = {
+export type Filter = {
   caseSensitive?: boolean
-  expressions?: CriteriaExpression[]
+  expressions?: Expression[]
   field?: FieldOrFormula
   fieldStateName?: string
   meta?: Meta
   operator?: Operator
-  targetFieldContext?: CriteriaTargetFieldContext
+  targetFieldContext?: TargetFieldContext
 }
 
 type Condition = {
   operator?: Operator
   // eslint-disable-next-line no-use-before-define
   children?: ConditionOrFilter[]
-  targetFieldContext?: CriteriaTargetFieldContext
+  targetFieldContext?: TargetFieldContext
   meta?: Meta
   field?: FieldOrFormula
   fieldStateName?: string
 }
 
-export type ConditionOrFilter = {
+type ConditionOrFilter = {
   condition?: Condition
   filter?: Filter
-}
-
-type Description = {
-  translationScriptId?: string
 }
 
 type DatasetDefinitionType = {
@@ -161,7 +158,7 @@ type DatasetDefinitionType = {
   baseRecord?: BaseRecord
   columns?: Column[]
   criteria?: ConditionOrFilter
-  description?: Description
+  description?: TranslationType
   formulas?: Formula[]
   id?: DefinitionId
   ownerId?: number
@@ -255,9 +252,9 @@ export const ParsedDatasetType = (): TypeAndInnerTypes => {
     path: [constants.NETSUITE, constants.TYPES_PATH, constants.DATASET],
   })
 
-  const datasetLabelElemID = new ElemID(constants.NETSUITE, 'dataset_label')
-  const datasetLabel = createMatchingObjectType<Label>({
-    elemID: datasetLabelElemID,
+  const datasetTranslationElemID = new ElemID(constants.NETSUITE, 'dataset_label')
+  const datasetTranslation = createMatchingObjectType<TranslationType>({
+    elemID: datasetTranslationElemID,
     annotations: {
     },
     fields: {
@@ -280,7 +277,7 @@ export const ParsedDatasetType = (): TypeAndInnerTypes => {
       },
       formulaSQL: { refType: BuiltinTypes.STRING },
       id: { refType: BuiltinTypes.STRING },
-      label: { refType: datasetLabel },
+      label: { refType: datasetTranslation },
       uniqueId: { refType: BuiltinTypes.STRING },
     },
     path: [constants.NETSUITE, constants.TYPES_PATH, constants.DATASET],
@@ -320,18 +317,7 @@ export const ParsedDatasetType = (): TypeAndInnerTypes => {
       alias: { refType: BuiltinTypes.STRING },
       columnId: { refType: BuiltinTypes.NUMBER },
       field: { refType: datasetFieldOrFormula },
-      label: { refType: datasetLabel },
-    },
-    path: [constants.NETSUITE, constants.TYPES_PATH, constants.DATASET],
-  })
-
-  const datasetDescriptionElemID = new ElemID(constants.NETSUITE, 'dataset_description') // not sure
-  const datasetDescription = createMatchingObjectType<Description>({
-    elemID: datasetDescriptionElemID,
-    annotations: {
-    },
-    fields: {
-      translationScriptId: { refType: createRefToElmWithValue(BuiltinTypes.STRING) },
+      label: { refType: datasetTranslation },
     },
     path: [constants.NETSUITE, constants.TYPES_PATH, constants.DATASET],
   })
@@ -348,19 +334,19 @@ export const ParsedDatasetType = (): TypeAndInnerTypes => {
   // })
 
   const expressionValueElemID = new ElemID(constants.NETSUITE, 'dataset_criteria_expression_value')
-  const expressionValue = createMatchingObjectType<CriteriaExpressionValue>({
+  const expressionValue = createMatchingObjectType<ExpressionValue>({
     elemID: expressionValueElemID,
     annotations: {
     },
     fields: {
       type: { refType: BuiltinTypes.STRING },
-      value: { refType: BuiltinTypes.STRING },
+      value: { refType: BuiltinTypes.STRING }, // is it string or unknown?
     },
     path: [constants.NETSUITE, constants.TYPES_PATH, constants.DATASET],
   })
 
   const expressionElemID = new ElemID(constants.NETSUITE, 'dataset_criteria_expression')
-  const expression = createMatchingObjectType<CriteriaExpression>({
+  const expression = createMatchingObjectType<Expression>({
     elemID: expressionElemID,
     annotations: {
     },
@@ -402,7 +388,7 @@ export const ParsedDatasetType = (): TypeAndInnerTypes => {
   })
 
   const datasetTargetFieldContextElemID = new ElemID(constants.NETSUITE, 'dataset_criteria_TargetFieldContext')
-  const datasetTargetFieldContext = createMatchingObjectType<CriteriaTargetFieldContext>({
+  const datasetTargetFieldContext = createMatchingObjectType<TargetFieldContext>({
     elemID: datasetTargetFieldContextElemID,
     annotations: {
     },
@@ -410,7 +396,7 @@ export const ParsedDatasetType = (): TypeAndInnerTypes => {
       name: {
         refType: BuiltinTypes.STRING,
         annotations: {
-          [CORE_ANNOTATIONS.RESTRICTION]: createRestriction({ values: criteriaTargetFieldContextNameList }),
+          [CORE_ANNOTATIONS.RESTRICTION]: createRestriction({ values: targetFieldContextNameList }),
         },
       },
     },
@@ -474,7 +460,7 @@ export const ParsedDatasetType = (): TypeAndInnerTypes => {
   innerTypes.criteriaMeta = datasetMeta
   innerTypes.criteria = datasetCriteria
   innerTypes.dependencies = datasetDependencies
-  innerTypes.description = datasetDescription
+  innerTypes.description = datasetTranslation
   innerTypes.expression = expression
   innerTypes.expressionValue = expressionValue
   innerTypes.fieldOrFormula = datasetFieldOrFormula
@@ -483,7 +469,7 @@ export const ParsedDatasetType = (): TypeAndInnerTypes => {
   innerTypes.formula = datasetFormula
   innerTypes.formulaFormula = datasetFormulaFormula
   innerTypes.joinTrail = datasetJoinTrail
-  innerTypes.label = datasetLabel
+  innerTypes.label = datasetTranslation
   innerTypes.operator = datasetOperator
 
   const datasetElemID = new ElemID(constants.NETSUITE, 'dataset')
@@ -512,7 +498,7 @@ export const ParsedDatasetType = (): TypeAndInnerTypes => {
       baseRecord: { refType: datasetBaseRecord },
       columns: { refType: new ListType(datasetColumn) },
       criteria: { refType: datasetCriteria },
-      description: { refType: datasetDescription },
+      description: { refType: datasetTranslation },
       formulas: { refType: new ListType(datasetFieldOrFormula) },
       id: { refType: BuiltinTypes.UNKNOWN },
       ownerId: { refType: BuiltinTypes.NUMBER },
