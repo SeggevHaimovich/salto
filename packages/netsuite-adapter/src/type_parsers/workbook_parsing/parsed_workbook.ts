@@ -87,7 +87,7 @@ type Column = {
   conditionalFormat?: ConditionalFormat[]
   criterion?: Filter
   customLabel?: TranslationType
-  datasetColumnId?: number
+  dataSetColumnId?: number
   datasetScriptId?: string
   fieldStateName?: FieldStateName
   sorting?: Sorting
@@ -121,7 +121,7 @@ type InnerWorkbook = {
   applicationId?: ApplicationId
   audience?: Audience
   chartIDs?: string[]
-  dataviewsIDs?: string[]
+  dataViewIDs?: string[]
   description?: TranslationType
   id?: DefinitionId
   name?: TranslationType
@@ -136,8 +136,12 @@ type WorkbookDefinitionType = {
   datasetLinks?: visualizationType[]
   dataViews?: visualizationType[]
   pivots?: visualizationType[]
-  innerWorkbook?: InnerWorkbook
+  Workbook?: InnerWorkbook
 }
+
+// type ScriptidListElement = {
+//   scriptid: string
+// }
 
 export type Workbook = {
   scriptid: string
@@ -145,25 +149,10 @@ export type Workbook = {
   dependencies?: {
     dependency?: string[]
   }
-  // charts?: {
-  //   chart?: { [key: string]: {
-  //     index?: number
-  //     scriptid?: string
-  //   } }
-  // }
-  // pivots?: {
-  //   pivot?: { [key: string]: {
-  //     index?: number
-  //     scriptid?: string
-  //   } }
-  // }
-  // tables?: {
-  //   table?: { [key: string]: {
-  //     index?: number
-  //     scriptid?: string
-  //   } }
-  // }
   definition?: string
+  // tables?: ScriptidListElement[]
+  // charts?: ScriptidListElement[]
+  // pivots?: ScriptidListElement[]
 } & WorkbookDefinitionType
 
 
@@ -213,7 +202,7 @@ export const ParsedWorkbookType = (): TypeAndInnerTypes => {
     },
     fields: {
       type: { refType: BuiltinTypes.STRING },
-      value: { refType: BuiltinTypes.STRING }, // is it string or unknown?
+      value: { refType: BuiltinTypes.UNKNOWN },
     },
     path: [constants.NETSUITE, constants.TYPES_PATH, constants.WORKBOOK],
   })
@@ -248,7 +237,7 @@ export const ParsedWorkbookType = (): TypeAndInnerTypes => {
     path: [constants.NETSUITE, constants.TYPES_PATH, constants.WORKBOOK],
   })
 
-  const workbookConditionalFormatFilterElemID = new ElemID(constants.NETSUITE, 'workbook_sorting')
+  const workbookConditionalFormatFilterElemID = new ElemID(constants.NETSUITE, 'workbook_conditional_format_filter')
   const workbookConditionalFormatFilter = createMatchingObjectType<ConditionalFormatFilter>({
     elemID: workbookConditionalFormatFilterElemID,
     annotations: {
@@ -260,7 +249,7 @@ export const ParsedWorkbookType = (): TypeAndInnerTypes => {
     path: [constants.NETSUITE, constants.TYPES_PATH, constants.WORKBOOK],
   })
 
-  const workbookFormatRuleFilterElemID = new ElemID(constants.NETSUITE, 'workbook_sorting')
+  const workbookFormatRuleFilterElemID = new ElemID(constants.NETSUITE, 'workbook_format_rule_filter')
   const workbookFormatRuleFilter = createMatchingObjectType<FormatRuleFilter>({
     elemID: workbookFormatRuleFilterElemID,
     annotations: {
@@ -271,7 +260,7 @@ export const ParsedWorkbookType = (): TypeAndInnerTypes => {
     path: [constants.NETSUITE, constants.TYPES_PATH, constants.WORKBOOK],
   })
 
-  const workbookRgbColorElemID = new ElemID(constants.NETSUITE, 'workbook_sorting')
+  const workbookRgbColorElemID = new ElemID(constants.NETSUITE, 'workbook_rgb_color')
   const workbookRgbColor = createMatchingObjectType<RgbColor>({
     elemID: workbookRgbColorElemID,
     annotations: {
@@ -284,7 +273,7 @@ export const ParsedWorkbookType = (): TypeAndInnerTypes => {
     path: [constants.NETSUITE, constants.TYPES_PATH, constants.WORKBOOK],
   })
 
-  const workbookBackgroundColorElemID = new ElemID(constants.NETSUITE, 'workbook_sorting')
+  const workbookBackgroundColorElemID = new ElemID(constants.NETSUITE, 'workbook_background_color')
   const workbookBackgroundColor = createMatchingObjectType<BackgroundColor>({
     elemID: workbookBackgroundColorElemID,
     annotations: {
@@ -295,7 +284,7 @@ export const ParsedWorkbookType = (): TypeAndInnerTypes => {
     path: [constants.NETSUITE, constants.TYPES_PATH, constants.WORKBOOK],
   })
 
-  const workbookStyleElemID = new ElemID(constants.NETSUITE, 'workbook_sorting')
+  const workbookStyleElemID = new ElemID(constants.NETSUITE, 'workbook_style')
   const workbookStyle = createMatchingObjectType<Style>({
     elemID: workbookStyleElemID,
     annotations: {
@@ -306,7 +295,7 @@ export const ParsedWorkbookType = (): TypeAndInnerTypes => {
     path: [constants.NETSUITE, constants.TYPES_PATH, constants.WORKBOOK],
   })
 
-  const workbookConditionalFormatRuleElemID = new ElemID(constants.NETSUITE, 'workbook_sorting')
+  const workbookConditionalFormatRuleElemID = new ElemID(constants.NETSUITE, 'workbook_conditional_format_rule')
   const workbookConditionalFormatRule = createMatchingObjectType<ConditionalFormatRule>({
     elemID: workbookConditionalFormatRuleElemID,
     annotations: {
@@ -319,7 +308,7 @@ export const ParsedWorkbookType = (): TypeAndInnerTypes => {
     path: [constants.NETSUITE, constants.TYPES_PATH, constants.WORKBOOK],
   })
 
-  const workbookFormatRuleElemID = new ElemID(constants.NETSUITE, 'workbook_sorting')
+  const workbookFormatRuleElemID = new ElemID(constants.NETSUITE, 'workbook_format_rule')
   const workbookFormatRule = createMatchingObjectType<FormatRule>({
     elemID: workbookFormatRuleElemID,
     annotations: {
@@ -330,7 +319,7 @@ export const ParsedWorkbookType = (): TypeAndInnerTypes => {
     path: [constants.NETSUITE, constants.TYPES_PATH, constants.WORKBOOK],
   })
 
-  const workbookCellConditionalFormatElemID = new ElemID(constants.NETSUITE, 'workbook_sorting')
+  const workbookCellConditionalFormatElemID = new ElemID(constants.NETSUITE, 'workbook_cell_conditional_format')
   const workbookCellConditionalFormat = createMatchingObjectType<CellConditionalFormat>({
     elemID: workbookCellConditionalFormatElemID,
     annotations: {
@@ -342,7 +331,7 @@ export const ParsedWorkbookType = (): TypeAndInnerTypes => {
     path: [constants.NETSUITE, constants.TYPES_PATH, constants.WORKBOOK],
   })
 
-  const workbookConditionalFormatElemID = new ElemID(constants.NETSUITE, 'workbook_sorting')
+  const workbookConditionalFormatElemID = new ElemID(constants.NETSUITE, 'workbook_conditional_format')
   const workbookConditionalFormat = createMatchingObjectType<ConditionalFormat>({
     elemID: workbookConditionalFormatElemID,
     annotations: {
@@ -484,7 +473,7 @@ export const ParsedWorkbookType = (): TypeAndInnerTypes => {
     path: [constants.NETSUITE, constants.TYPES_PATH, constants.WORKBOOK],
   })
 
-  const workbookColumnElemID = new ElemID(constants.NETSUITE, 'workbook_sorting')
+  const workbookColumnElemID = new ElemID(constants.NETSUITE, 'workbook_column')
   const workbookColumn = createMatchingObjectType<Column>({
     elemID: workbookColumnElemID,
     annotations: {
@@ -493,7 +482,7 @@ export const ParsedWorkbookType = (): TypeAndInnerTypes => {
       conditionalFormat: { refType: new ListType(workbookConditionalFormat) },
       criterion: { refType: workbookFilter },
       customLabel: { refType: workbookTranslation },
-      datasetColumnId: { refType: BuiltinTypes.NUMBER },
+      dataSetColumnId: { refType: BuiltinTypes.NUMBER },
       datasetScriptId: { refType: BuiltinTypes.STRING },
       fieldStateName: {
         refType: BuiltinTypes.STRING,
@@ -508,7 +497,7 @@ export const ParsedWorkbookType = (): TypeAndInnerTypes => {
     path: [constants.NETSUITE, constants.TYPES_PATH, constants.WORKBOOK],
   })
 
-  const workbookVisualizationTypeBasicsElemID = new ElemID(constants.NETSUITE, 'workbook_sorting')
+  const workbookVisualizationTypeBasicsElemID = new ElemID(constants.NETSUITE, 'workbook_visualization_type_basics')
   const workbookVisualizationTypeBasics = createMatchingObjectType<VisualizationTypeBasics>({
     elemID: workbookVisualizationTypeBasicsElemID,
     annotations: {
@@ -530,7 +519,7 @@ export const ParsedWorkbookType = (): TypeAndInnerTypes => {
     path: [constants.NETSUITE, constants.TYPES_PATH, constants.WORKBOOK],
   })
 
-  const workbookVisualizationTypeElemID = new ElemID(constants.NETSUITE, 'workbook_sorting')
+  const workbookVisualizationTypeElemID = new ElemID(constants.NETSUITE, 'workbook_visualization_type')
   const workbookVisualizationType = createMatchingObjectType<visualizationType>({
     elemID: workbookVisualizationTypeElemID,
     annotations: {
@@ -556,7 +545,7 @@ export const ParsedWorkbookType = (): TypeAndInnerTypes => {
     path: [constants.NETSUITE, constants.TYPES_PATH, constants.WORKBOOK],
   })
 
-  const workbookInnerWorkbookElemID = new ElemID(constants.NETSUITE, 'workbook_sorting')
+  const workbookInnerWorkbookElemID = new ElemID(constants.NETSUITE, 'workbook_inner_workbook')
   const workbookInnerWorkbook = createMatchingObjectType<InnerWorkbook>({
     elemID: workbookInnerWorkbookElemID,
     annotations: {
@@ -565,7 +554,7 @@ export const ParsedWorkbookType = (): TypeAndInnerTypes => {
       applicationId: { refType: BuiltinTypes.UNKNOWN },
       audience: { refType: workbookAudience },
       chartIDs: { refType: new ListType(BuiltinTypes.STRING) },
-      dataviewsIDs: { refType: new ListType(BuiltinTypes.STRING) },
+      dataViewIDs: { refType: new ListType(BuiltinTypes.STRING) },
       description: { refType: workbookTranslation },
       id: { refType: BuiltinTypes.UNKNOWN },
       name: { refType: workbookTranslation },
@@ -607,6 +596,23 @@ export const ParsedWorkbookType = (): TypeAndInnerTypes => {
     },
     path: [constants.NETSUITE, constants.TYPES_PATH, constants.WORKBOOK],
   })
+
+  // const workbookScriptidListElementElemID = new ElemID(constants.NETSUITE, 'workbook_tables_table')
+  // const workbookScriptidListElement = createMatchingObjectType<ScriptidListElement>({
+  //   elemID: workbookScriptidListElementElemID,
+  //   annotations: {
+  //   },
+  //   fields: {
+  //     scriptid: {
+  //       refType: createRefToElmWithValue(BuiltinTypes.SERVICE_ID),
+  //       annotations: {
+  //         _required: true,
+  //         [constants.IS_ATTRIBUTE]: true,
+  //       },
+  //     },
+  //   },
+  //   path: [constants.NETSUITE, constants.TYPES_PATH, constants.WORKBOOK],
+  // })
 
   innerTypes.workbookOperator = workbookOperator
   innerTypes.workbookTargetFieldContext = workbookTargetFieldContext
@@ -667,14 +673,17 @@ export const ParsedWorkbookType = (): TypeAndInnerTypes => {
       datasetLinks: { refType: new ListType(workbookVisualizationType) },
       dataViews: { refType: new ListType(workbookVisualizationType) },
       pivots: { refType: new ListType(workbookVisualizationType) },
-      innerWorkbook: { refType: workbookInnerWorkbook },
+      Workbook: { refType: workbookInnerWorkbook },
+      // tables: { refType: new ListType(workbookScriptidListElement) },
+      // charts: { refType: new ListType(workbookScriptidListElement) },
+      // tables: { refType: new ListType(workbookScriptidListElement) },
     },
     path: [constants.NETSUITE, constants.TYPES_PATH, constants.WORKBOOK],
   })
   return { type: workbook, innerTypes }
 }
 
-
+// ############### inner XMLs ###############
 // type CategoryDef = {
 //   axis: Axis
 //   dimensionTree:

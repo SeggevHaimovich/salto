@@ -104,7 +104,7 @@ export type Column = {
 }
 export type ExpressionValue = {
   type?: string
-  value?: string // is it really string or is it unknown?
+  value?: Value
 }
 
 export type Expression = {
