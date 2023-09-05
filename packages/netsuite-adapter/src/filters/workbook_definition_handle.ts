@@ -58,9 +58,11 @@ const fieldsWithT = new Set([
 const notAddingFields = new Set([
   ...fieldsWithT,
   'fieldValidityState',
-  // 'format',
-  // 'definition',
-  // 'mapping',
+
+  // TODO change to check the field instead
+  'format',
+  'definition',
+  'mapping',
 ])
 
 const originalFields = [
@@ -145,15 +147,15 @@ const createDatasetInstances = async (instance: InstanceElement): Promise<Instan
 }
 
 const createEmptyObjectOfType = async (typeElem: TypeElement): Promise<Value> => {
-  if (isContainerType(typeElem)) {
-    // we only have lists in the type
-    return {
-      [TYPE]: 'array',
-    }
+  const arrayObject = {
+    [TYPE]: 'array',
   }
-
   const nullObject = {
     [TYPE]: 'null',
+  }
+  if (isContainerType(typeElem)) {
+    // we only have lists in the type
+    return arrayObject
   }
 
   if (isPrimitiveType(typeElem)) {
@@ -171,7 +173,9 @@ const createEmptyObjectOfType = async (typeElem: TypeElement): Promise<Value> =>
 
   // object that contains only nulls should be null
   // TODO check if there is a field inside that is an empty array, should the upper field be null?
-  if (Object.keys(newObject).every(key => _.isEqual(newObject[key], nullObject))) {
+  if (Object.keys(newObject).every(key =>
+    _.isEqual(newObject[key], nullObject)
+    || _.isEqual(newObject[key], arrayObject))) {
     return nullObject
   }
   return newObject
