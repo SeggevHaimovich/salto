@@ -59,6 +59,7 @@ const fieldsWithT = new Set([
 const notAddingFields = new Set([
   ...fieldsWithT,
   'fieldValidityState',
+  'datasetLink',
 
   // TODO change to check the field instead
   'format',
