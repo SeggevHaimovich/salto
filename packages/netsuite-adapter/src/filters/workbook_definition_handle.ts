@@ -14,7 +14,7 @@
 * limitations under the License.
 */
 
-import { BuiltinTypes, Change, ElemID, getChangeData, InstanceElement, isContainerType, isInstanceChange, isInstanceElement, isObjectType, isPrimitiveType, isReferenceExpression, ObjectType, ReferenceExpression, TypeElement, Value, Values } from '@salto-io/adapter-api'
+import { BuiltinTypes, Change, ElemID, getChangeData, InstanceElement, isInstanceChange, isInstanceElement, isListType, isObjectType, isReferenceExpression, ObjectType, ReferenceExpression, TypeElement, Value, Values } from '@salto-io/adapter-api'
 import _, { isBoolean, isPlainObject, isString } from 'lodash'
 import { TransformFuncArgs, transformValues, WALK_NEXT_STEP, WalkOnFunc, walkOnValue } from '@salto-io/adapter-utils'
 import { parse, j2xParser } from 'fast-xml-parser'
@@ -38,34 +38,6 @@ const ITEM = '_ITEM_'
 const TEXT = '#text'
 
 const TValuesToIgnore = new Set(['workbook'])
-
-// TODO there is a problem with this becouse if there are more options we don't know this will work not good
-// maybe just transfer _T_ to type and vice versa
-const fieldsWithT = new Set([
-  'pivot',
-  'chart',
-  'dataView',
-  'dsLink',
-  'cellConditionalFormat',
-  'conditionalFormatRule',
-  'rgbColor',
-  'conditionalFormatFilter',
-  'filter',
-  'condition',
-  'fieldReference',
-  'dataSetFormula',
-])
-
-const notAddingFields = new Set([
-  ...fieldsWithT,
-  'fieldValidityState',
-  'datasetLink',
-
-  // TODO change to check the field instead
-  'format',
-  'definition',
-  'mapping',
-])
 
 const originalFields = [
   'scriptid',
@@ -145,53 +117,25 @@ const createWorkbookInstances = async (instance: InstanceElement): Promise<Insta
   })
 
   if (updatedValues) {
-    // updatedValues.Workbook = _.omit(updatedValues.Workbook, 'dataViewIDs', 'pivotIDs', 'chartIDs')
     instance.value = {
       ..._.omit(updatedValues, 'name'),
-      ..._.omit(instance.value, 'charts', 'pivots', 'tables'), // add definition
+      ..._.omit(instance.value, 'charts', 'pivots', 'tables', 'defintion'),
     }
-
-    // eslint-disable-next-line no-use-before-define
-    // instance.value = await returnToOriginalShape(instance)
   }
 
   return instance
 }
 
+// very different from the dataset
 const createEmptyObjectOfType = async (typeElem: TypeElement): Promise<Value> => {
-  const arrayObject = {
-    [TYPE]: 'array',
+  if (isListType(typeElem)) {
+    return {
+      [TYPE]: 'array',
+    }
   }
-  const nullObject = {
+  return {
     [TYPE]: 'null',
   }
-  if (isContainerType(typeElem)) {
-    // we only have lists in the type
-    return arrayObject
-  }
-
-  if (isPrimitiveType(typeElem)) {
-    return nullObject
-  }
-
-  // it must be an object (recursive building the object)
-  const keys = Object.keys(typeElem.fields)
-  const newObject: { [key: string]: Value} = {}
-  await awu(keys)
-    .filter(key => !(notAddingFields.has(key)))
-    .forEach(async key => {
-      newObject[key] = await createEmptyObjectOfType(await typeElem.fields[key].getType())
-    })
-
-  // object that contains only nulls should be null
-  // TODO check if there is a field inside that is an empty array, should the upper field be null?
-  // this is different from the dataset
-  if (Object.keys(newObject).every(key =>
-    _.isEqual(newObject[key], nullObject)
-    || _.isEqual(newObject[key], arrayObject))) {
-    return nullObject
-  }
-  return newObject
 }
 
 const checkReferenceToTranslation = (name: string): boolean => {
@@ -277,12 +221,13 @@ const deployTransformFunc = async ({ value, field, path }: TransformFuncArgs): P
     if (XML_TYPE in fieldType.annotations && Object.keys(value).length === 1) {
       // eslint-disable-next-line prefer-destructuring
       value[T] = Object.keys(value)[0] // TODO check if there is a better way
+    } else {
+      await awu(Object.keys(fieldType.fields))
+        .filter(key => !(key in value) && fieldType.fields[key].annotations.DO_NOT_ADD !== true)
+        .forEach(async key => {
+          value[key] = await createEmptyObjectOfType(await fieldType.fields[key].getType())
+        })
     }
-    await awu(Object.keys(fieldType.fields))
-      .filter(key => !(key in value) && !(notAddingFields.has(key)))
-      .forEach(async key => {
-        value[key] = await createEmptyObjectOfType(await fieldType.fields[key].getType())
-      })
   }
   return value
 }

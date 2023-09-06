@@ -450,6 +450,7 @@ export const ParsedWorkbookType = (): TypeAndInnerTypes => {
         refType: BuiltinTypes.STRING,
         annotations: {
           [CORE_ANNOTATIONS.RESTRICTION]: createRestriction({ values: validityList }),
+          DO_NOT_ADD: true,
         },
       },
     },
@@ -611,11 +612,31 @@ export const ParsedWorkbookType = (): TypeAndInnerTypes => {
       scriptId: { refType: BuiltinTypes.UNKNOWN },
       version: { refType: BuiltinTypes.STRING },
       workbook: { refType: BuiltinTypes.STRING },
-      format: { refType: BuiltinTypes.STRING },
-      definition: { refType: BuiltinTypes.STRING },
-      mapping: { refType: BuiltinTypes.STRING },
-      columns: { refType: new ListType(workbookColumn) },
-      datasetLink: { refType: BuiltinTypes.STRING },
+      columns: { refType: new ListType(workbookColumn) }, // may be a problem
+      format: {
+        refType: BuiltinTypes.STRING,
+        annotations: {
+          DO_NOT_ADD: true,
+        },
+      },
+      definition: {
+        refType: BuiltinTypes.STRING,
+        annotations: {
+          DO_NOT_ADD: true,
+        },
+      },
+      mapping: {
+        refType: BuiltinTypes.STRING,
+        annotations: {
+          DO_NOT_ADD: true,
+        },
+      },
+      datasetLink: {
+        refType: BuiltinTypes.STRING,
+        annotations: {
+          DO_NOT_ADD: true,
+        },
+      },
     },
     path: [constants.NETSUITE, constants.TYPES_PATH, constants.WORKBOOK],
   })
