@@ -21,12 +21,13 @@ import { fieldTypes } from '../../types/field_types'
 
 // can't deploy ownerId - do strange thing (change and stay after fetch, doesn't change the owner in the UI)
 
+// TODO change all this to just string
 // TODO add all the options to all
 export const codeList = ['AND', 'OR',
   'ANY_OF',
   'EMPTY', 'EMPTY_NOT', 'CONTAIN', 'CONTAIN_NOT', 'ENDWITH', 'ENDWITH_NOT', 'IS', 'IS_NOT', 'START_WITH', 'START_WITH_NOT',
   'LESS', 'GREATER', 'EQUAL', 'EQUAL_NOT', 'GREATER_OR_EQUAL', 'LESS_OR_EQUAL', 'BETWEEN', 'BETWEEN_NOT'] as const
-const targetFieldContextNameList = ['DEFAULT', 'IDENTIFIER', 'UNCONSOLIDATED'] as const
+const targetFieldContextNameList = ['DEFAULT', 'IDENTIFIER', 'UNCONSOLIDATED', 'HIERARCHY_IDENTIFIER'] as const
 export const formulaDataTypeList = ['INTEGER', 'BOOLEAN', 'DATE', 'DATETIME', 'FLOAT', 'STRING', 'CLOBTEXT', 'PERCENT', 'DURATION'] as const
 export const validityList = ['VALID'] // ????? could it be something else?
 
@@ -137,7 +138,7 @@ export type Filter = {
   targetFieldContext?: TargetFieldContext
 }
 
-type Condition = {
+export type Condition = {
   operator?: Operator
   // eslint-disable-next-line no-use-before-define
   children?: ConditionOrFilter[]
@@ -147,7 +148,7 @@ type Condition = {
   fieldStateName?: string
 }
 
-type ConditionOrFilter = {
+export type ConditionOrFilter = {
   condition?: Condition
   filter?: Filter
 }
@@ -322,17 +323,6 @@ export const ParsedDatasetType = (): TypeAndInnerTypes => {
     path: [constants.NETSUITE, constants.TYPES_PATH, constants.DATASET],
   })
 
-  // const datasetNameElemID = new ElemID(constants.NETSUITE, 'dataset_name')
-  // const datasetName = createMatchingObjectType<Name>({
-  //   elemID: datasetNameElemID,
-  //   annotations: {
-  //   },
-  //   fields: {
-  //     translationScriptId: { refType: BuiltinTypes.STRING },
-  //   },
-  //   path: [constants.NETSUITE, constants.TYPES_PATH, constants.DATASET],
-  // })
-
   const expressionValueElemID = new ElemID(constants.NETSUITE, 'dataset_criteria_expression_value')
   const expressionValue = createMatchingObjectType<ExpressionValue>({
     elemID: expressionValueElemID,
@@ -340,7 +330,7 @@ export const ParsedDatasetType = (): TypeAndInnerTypes => {
     },
     fields: {
       type: { refType: BuiltinTypes.STRING },
-      value: { refType: BuiltinTypes.STRING }, // is it string or unknown?
+      value: { refType: BuiltinTypes.UNKNOWN },
     },
     path: [constants.NETSUITE, constants.TYPES_PATH, constants.DATASET],
   })
