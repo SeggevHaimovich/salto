@@ -238,10 +238,11 @@ const deployWalkFunc: WalkOnFunc = ({ value }) => {
     const innerVal = value[key]
     if (isPlainObject(innerVal)) {
       const innerkeys = Object.keys(innerVal)
-      if (innerkeys.length === 1 && fieldsWithT.has(innerkeys[0])) {
+      if (innerkeys.length === 2 && innerkeys.includes(T)) {
+        const otherKey = innerkeys.filter(innerKey => innerKey !== T)[0]
         return {
-          [T]: innerkeys[0],
-          ...value[key][innerkeys[0]],
+          [T]: innerVal[T],
+          ...innerVal[otherKey],
         }
       }
     }
@@ -273,6 +274,10 @@ const deployWalkFunc: WalkOnFunc = ({ value }) => {
 const deployTransformFunc = async ({ value, field, path }: TransformFuncArgs): Promise<Value> => {
   const fieldType = (path?.getFullName().split('.').length === 4) ? ParsedWorkbookType().type : await field?.getType()
   if (isObjectType(fieldType) && isPlainObject(value) && !(TYPE in value)) {
+    if (XML_TYPE in fieldType.annotations && Object.keys(value).length === 1) {
+      // eslint-disable-next-line prefer-destructuring
+      value[T] = Object.keys(value)[0] // TODO check if there is a better way
+    }
     await awu(Object.keys(fieldType.fields))
       .filter(key => !(key in value) && !(notAddingFields.has(key)))
       .forEach(async key => {
@@ -282,102 +287,12 @@ const deployTransformFunc = async ({ value, field, path }: TransformFuncArgs): P
   return value
 }
 
-// const deployTransformFunc2 = async ({ value, field, path }: TransformFuncArgs): Promise<Value> => {
-//   const checkReference = (key: string): Value => {
-//     if (key === 'translationScriptId' && isReferenceExpression(value[key])) {
-//       const name = value[key].elemID.getFullName()
-//       if (checkReferenceToTranslation(name)) {
-//         const nameList = name.split('.')
-//         return nameList[3].concat('.', nameList[6])
-//       }
-//       return name
-//     }
-//     return value[key]
-//   }
-
-//   const checkTypeField = (key: string | number): Value => {
-//     if (Array.isArray(value[key])) {
-//       return {
-//         [TYPE]: 'array',
-//         [ITEM]: value[key],
-//       }
-//     }
-//     if (isBoolean(value[key])) {
-//       // eslint-disable-next-line no-param-reassign
-//       return {
-//         [TYPE]: 'boolean',
-//         [TEXT]: String(value[key]),
-//       }
-//     }
-//     if (isString(value[key]) && isNumberStr(value[key])) {
-//       return {
-//         [TYPE]: 'string',
-//         [TEXT]: String(value[key]),
-//       }
-//     }
-//     return value[key]
-//   }
-//   const checkT = async (key: string | number, fieldType: TypeElement | undefined): Promise<Value> => {
-//     const innerVal = value[key]
-//     const innerType = (isObjectType(fieldType) && fieldType.fields[key] !== undefined)
-//       ? await fieldType.fields[key].getType() : undefined
-//     if (isPlainObject(innerVal)) {
-//       const innerkeys = Object.keys(innerVal)
-//       if (innerkeys.length === 1 && isObjectType(innerType) && XML_TYPE in innerType.annotations) {
-//         return {
-//           [T]: innerkeys[0],
-//           ...value[key][innerkeys[0]],
-//         }
-//       }
-//       if ('xmlType' in innerkeys) {
-//         return {
-//           [T]: innerVal.xmlType,
-//           ..._.omit(innerVal, 'xmlType'),
-//         }
-//       }
-//     }
-//     return value[key]
-//   }
-
-//   const fieldType = (path?.getFullName().split('.').length === 4)
-//     ? ParsedWorkbookType().type : await field?.getType()
-//   if (isPlainObject(value)) {
-//     const keys = Object.keys(value)
-
-//     keys.forEach(async key => {
-//       value[key] = await checkT(key, fieldType)
-//       value[key] = checkReference(key)
-//     })
-
-//     if (!(TYPE in value)) {
-//       keys.forEach(key => {
-//         value[key] = checkTypeField(key)
-//       })
-//     }
-//   } else if (Array.isArray(value)) {
-//     value.forEach(async (_val, index) => {
-//       value[index] = await checkT(index, fieldType)
-//       value[index] = checkTypeField(index)
-//     })
-//   }
-//   return value
-// }
-
 const matchToXmlObjectForm = (instance: InstanceElement, definitionValues: Values): void =>
   walkOnValue({
     elemId: instance.elemID,
     value: definitionValues,
     func: deployWalkFunc,
   })
-
-// const matchToXmlObjectFormNew = async (instance: InstanceElement, definitionValues: Values): Promise<Value> =>
-//   await transformValues({
-//     values: definitionValues,
-//     type: ParsedWorkbookType().type,
-//     transformFunc: deployTransformFunc2,
-//     strict: false,
-//     pathID: instance.elemID,
-//   }) ?? definitionValues
 
 const addMissingFields = async (instance: InstanceElement, definitionValues: Values): Promise<Values> =>
   await transformValues({
@@ -419,8 +334,6 @@ const returnToOriginalShape = async (instance: InstanceElement): Promise<Value> 
     ..._.omit(instance.value, originalFields),
   }
   const fullDefinitionValues = await addMissingFields(instance, definitionValues)
-  // const fullMatchingDefinitionValues = await matchToXmlObjectFormNew(instance, fullDefinitionValues)
-  // log.debug('', fullMatchingDefinitionValues)
   matchToXmlObjectForm(instance, fullDefinitionValues)
   fullDefinitionValues.Workbook[T] = 'workbook'
   fullDefinitionValues.name = instance.value.name
