@@ -20,6 +20,7 @@ import { createMatchingObjectType } from '@salto-io/adapter-utils'
 import { TypeAndInnerTypes } from '../../types/object_types'
 import * as constants from '../../constants'
 import { ApplicationId, Audience, BaseRecord, Condition, ConditionOrFilter, DefinitionId, DefinitionScriptId, Dependencies, Expression, ExpressionValue, FieldOrFormula, FieldReference, Filter, Formula, FormulaFormula, JoinTrail, Meta, Operator, TranslationType, codeList, formulaDataTypeList, validityList } from '../dataset_parsing/parsed_dataset'
+import { fieldTypes } from '../../types/field_types'
 
 // const log = logger(module)
 
@@ -110,15 +111,25 @@ type VisualizationTypeBasics = {
   datasets?: string[]
   id?: DefinitionId
   name?: TranslationType
-  order?: number
   scriptId?: DefinitionScriptId
-  version?: string
   workbook?: string
-  format?: string // ??? I don't know what this field is
+  version?: string
+}
+
+type ChartOrPivot = VisualizationTypeBasics & {
   definition?: string
-  mapping?: string
-  columns?: Column[]
+  format?: string
   datasetLink?: string
+  order?: number
+}
+
+type DsLink = VisualizationTypeBasics & {
+  mapping?: string
+}
+
+type DataView = VisualizationTypeBasics & {
+  columns?: Column[]
+  order?: number
 }
 
 type visualizationType = {
@@ -598,49 +609,105 @@ export const ParsedWorkbookType = (): TypeAndInnerTypes => {
   })
   innerTypes.workbookColumn = workbookColumn
 
-  const workbookVisualizationTypeBasicsElemID = new ElemID(constants.NETSUITE, 'workbook_visualization_type_basics')
-  const workbookVisualizationTypeBasics = createMatchingObjectType<VisualizationTypeBasics>({
-    elemID: workbookVisualizationTypeBasicsElemID,
+  // const workbookVisualizationTypeBasicsElemID = new ElemID(constants.NETSUITE, 'workbook_visualization_type_basics')
+  // const workbookVisualizationTypeBasics = createMatchingObjectType<VisualizationTypeBasics>({
+  //   elemID: workbookVisualizationTypeBasicsElemID,
+  //   annotations: {
+  //   },
+  //   fields: {
+  //     applicationId: { refType: BuiltinTypes.UNKNOWN },
+  //     datasets: { refType: new ListType(BuiltinTypes.STRING) },
+  //     id: { refType: BuiltinTypes.UNKNOWN },
+  //     name: { refType: workbookTranslation },
+  //     order: { refType: BuiltinTypes.NUMBER },
+  //     scriptId: { refType: BuiltinTypes.UNKNOWN },
+  //     version: { refType: BuiltinTypes.STRING },
+  //     workbook: { refType: BuiltinTypes.STRING },
+  //   },
+  //   path: [constants.NETSUITE, constants.TYPES_PATH, constants.WORKBOOK],
+  // })
+  // innerTypes.workbookVisualizationTypeBasics = workbookVisualizationTypeBasics
+
+  const workbookChartOrPivotElemID = new ElemID(constants.NETSUITE, 'workbook_chart_or_pivot')
+  const workbookChartOrPivot = createMatchingObjectType<ChartOrPivot>({
+    elemID: workbookChartOrPivotElemID,
     annotations: {
     },
     fields: {
-      applicationId: { refType: BuiltinTypes.UNKNOWN },
-      datasets: { refType: new ListType(BuiltinTypes.STRING) },
       id: { refType: BuiltinTypes.UNKNOWN },
-      name: { refType: workbookTranslation },
-      order: { refType: BuiltinTypes.NUMBER },
       scriptId: { refType: BuiltinTypes.UNKNOWN },
+      applicationId: { refType: BuiltinTypes.UNKNOWN },
       version: { refType: BuiltinTypes.STRING },
+      name: { refType: workbookTranslation },
       workbook: { refType: BuiltinTypes.STRING },
-      columns: { refType: new ListType(workbookColumn) }, // may be a problem
+      datasets: { refType: new ListType(BuiltinTypes.STRING) },
       format: {
         refType: BuiltinTypes.STRING,
         annotations: {
-          DO_NOT_ADD: true,
         },
       },
+      order: { refType: BuiltinTypes.NUMBER },
       definition: {
-        refType: BuiltinTypes.STRING,
+        refType: createRefToElmWithValue(fieldTypes.cdata),
         annotations: {
-          DO_NOT_ADD: true,
-        },
-      },
-      mapping: {
-        refType: BuiltinTypes.STRING,
-        annotations: {
-          DO_NOT_ADD: true,
         },
       },
       datasetLink: {
         refType: BuiltinTypes.STRING,
         annotations: {
-          DO_NOT_ADD: true,
         },
       },
     },
     path: [constants.NETSUITE, constants.TYPES_PATH, constants.WORKBOOK],
   })
-  innerTypes.workbookVisualizationTypeBasics = workbookVisualizationTypeBasics
+  innerTypes.workbookChartOrPivot = workbookChartOrPivot
+
+  const workbookDsLinkElemID = new ElemID(constants.NETSUITE, 'workbook_dsLink')
+  const workbookDsLink = createMatchingObjectType<DsLink>({
+    elemID: workbookDsLinkElemID,
+    annotations: {
+    },
+    fields: {
+      id: { refType: BuiltinTypes.UNKNOWN },
+      scriptId: { refType: BuiltinTypes.UNKNOWN },
+      applicationId: { refType: BuiltinTypes.UNKNOWN },
+      version: { refType: BuiltinTypes.STRING },
+      name: { refType: workbookTranslation },
+      workbook: { refType: BuiltinTypes.STRING },
+      datasets: { refType: new ListType(BuiltinTypes.STRING) },
+      mapping: {
+        refType: createRefToElmWithValue(fieldTypes.cdata),
+        annotations: {
+        },
+      },
+    },
+    path: [constants.NETSUITE, constants.TYPES_PATH, constants.WORKBOOK],
+  })
+  innerTypes.workbookDsLink = workbookDsLink
+
+  const workbookDataViewElemID = new ElemID(constants.NETSUITE, 'workbook_data_view')
+  const workbookDataView = createMatchingObjectType<DataView>({
+    elemID: workbookDataViewElemID,
+    annotations: {
+    },
+    fields: {
+      id: { refType: BuiltinTypes.UNKNOWN },
+      scriptId: { refType: BuiltinTypes.UNKNOWN },
+      applicationId: { refType: BuiltinTypes.UNKNOWN },
+      version: { refType: BuiltinTypes.STRING },
+      name: { refType: workbookTranslation },
+      workbook: { refType: BuiltinTypes.STRING },
+      datasets: { refType: new ListType(BuiltinTypes.STRING) },
+      columns: {
+        refType: new ListType(workbookColumn),
+        annotations: {
+        },
+      },
+      order: { refType: BuiltinTypes.NUMBER },
+    },
+    path: [constants.NETSUITE, constants.TYPES_PATH, constants.WORKBOOK],
+  })
+  innerTypes.workbookDataView = workbookDataView
 
   const workbookVisualizationTypeElemID = new ElemID(constants.NETSUITE, 'workbook_visualization_type')
   const workbookVisualizationType = createMatchingObjectType<visualizationType>({
@@ -649,10 +716,10 @@ export const ParsedWorkbookType = (): TypeAndInnerTypes => {
       XML_TYPE: true,
     },
     fields: {
-      chart: { refType: workbookVisualizationTypeBasics },
-      dsLink: { refType: workbookVisualizationTypeBasics },
-      dataView: { refType: workbookVisualizationTypeBasics },
-      pivot: { refType: workbookVisualizationTypeBasics },
+      chart: { refType: workbookChartOrPivot },
+      dsLink: { refType: workbookDsLink },
+      dataView: { refType: workbookDataView },
+      pivot: { refType: workbookChartOrPivot },
     },
     path: [constants.NETSUITE, constants.TYPES_PATH, constants.WORKBOOK],
   })
@@ -678,17 +745,17 @@ export const ParsedWorkbookType = (): TypeAndInnerTypes => {
       XML_TYPE: true,
     },
     fields: {
-      applicationId: { refType: BuiltinTypes.UNKNOWN },
-      audience: { refType: workbookAudience },
-      chartIDs: { refType: new ListType(BuiltinTypes.STRING) },
-      dataViewIDs: { refType: new ListType(BuiltinTypes.STRING) },
-      description: { refType: workbookTranslation },
       id: { refType: BuiltinTypes.UNKNOWN },
-      name: { refType: workbookTranslation },
-      ownerId: { refType: BuiltinTypes.NUMBER },
-      pivotIDs: { refType: new ListType(BuiltinTypes.STRING) },
       scriptId: { refType: BuiltinTypes.UNKNOWN },
+      applicationId: { refType: BuiltinTypes.UNKNOWN },
       version: { refType: BuiltinTypes.STRING },
+      name: { refType: workbookTranslation },
+      audience: { refType: workbookAudience },
+      ownerId: { refType: BuiltinTypes.NUMBER },
+      description: { refType: workbookTranslation },
+      dataViewIDs: { refType: new ListType(BuiltinTypes.STRING) },
+      pivotIDs: { refType: new ListType(BuiltinTypes.STRING) },
+      chartIDs: { refType: new ListType(BuiltinTypes.STRING) },
     },
     path: [constants.NETSUITE, constants.TYPES_PATH, constants.WORKBOOK],
   })

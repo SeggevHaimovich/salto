@@ -45,7 +45,7 @@ import dataInstancesNullFields from './filters/data_instances_null_fields'
 import dataInstancesDiff from './filters/data_instances_diff'
 import dataInstancesIdentifiers from './filters/data_instances_identifiers'
 import datasetDefinitionHandle from './filters/dataset_definition_handle'
-import workbookDefinitionHandle from './filters/workbook_definition_handle'
+// import workbookDefinitionHandle from './filters/workbook_definition_handle'
 // import workbookDefinitionHandle from './filters/workbook_definition_handle2'
 import suiteAppInternalIds from './filters/internal_ids/suite_app_internal_ids'
 import SDFInternalIds from './filters/internal_ids/sdf_internal_ids'
@@ -114,7 +114,7 @@ export const allFilters: (LocalFilterCreatorDefinition | RemoteFilterCreatorDefi
   { creator: dataInstancesCustomFields },
   { creator: dataInstancesNullFields },
   { creator: datasetDefinitionHandle },
-  { creator: workbookDefinitionHandle },
+  // { creator: workbookDefinitionHandle },
   { creator: removeUnsupportedTypes },
   { creator: dataInstancesReferences },
   { creator: dataInstancesInternalId },

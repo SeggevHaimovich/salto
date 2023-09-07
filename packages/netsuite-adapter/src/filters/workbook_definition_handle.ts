@@ -119,7 +119,7 @@ const createWorkbookInstances = async (instance: InstanceElement): Promise<Insta
   if (updatedValues) {
     instance.value = {
       ..._.omit(updatedValues, 'name'),
-      ..._.omit(instance.value, 'charts', 'pivots', 'tables', 'defintion'),
+      ..._.omit(instance.value, 'charts', 'pivots', 'tables', 'definition'),
     }
   }
 
