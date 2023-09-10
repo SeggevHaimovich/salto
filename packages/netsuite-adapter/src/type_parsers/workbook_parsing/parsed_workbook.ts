@@ -409,7 +409,7 @@ export const ParsedWorkbookType = (): TypeAndInnerTypes => {
   })
   innerTypes.workbookConditionalFormat = workbookConditionalFormat
 
-  const workbookTranslationElemID = new ElemID(constants.NETSUITE, 'workbook_label')
+  const workbookTranslationElemID = new ElemID(constants.NETSUITE, 'workbook_translation')
   const workbookTranslation = createMatchingObjectType<TranslationType>({
     elemID: workbookTranslationElemID,
     annotations: {

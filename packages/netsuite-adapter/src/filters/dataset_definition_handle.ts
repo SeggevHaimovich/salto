@@ -67,65 +67,73 @@ const cloneReportInstance = (instance: InstanceElement, type: ObjectType): Insta
   new InstanceElement(instance.elemID.name, type, instance.value,
     instance.path, instance.annotations)
 
-const fetchTransformFunc = async ({ value, field }: TransformFuncArgs): Promise<Value> => {
-  const fieldType = await field?.getType()
-  if (_.isPlainObject(value)) {
-    if (TYPE in value) {
-      if (value[TYPE] === 'null') {
-        return {}
-      } if (value[TYPE] === 'array') {
-        if (value[ITEM] !== undefined) {
-          return (Array.isArray(value[ITEM])) ? value[ITEM] : [value[ITEM]]
-        }
-        return []
-      } if (value[TYPE] === 'boolean') {
-        return value[TEXT]
-      } if (value[TYPE] === 'string') {
-        return String(value[TEXT])
-      }
-    }
-    if (T in value) {
-      return TValuesToIgnore.has(value[T]) ? _.omit(value, T) : {
-        [value[T]]: _.omit(value, T),
-      }
-    }
-    return value
-  }
-  if (isString(value) && value.startsWith('custcollectiontranslations')) {
-    const nameParts = value.split('.')
-    if (nameParts.length === 2) {
-      const finalElemIdPath = `translationcollection.instance.${nameParts[0]}.strings.string.${nameParts[1]}.scriptid`
-      return new ReferenceExpression(new ElemID(NETSUITE, finalElemIdPath))
-    }
-  }
-  if (fieldType?.elemID.isEqual(BuiltinTypes.STRING.elemID)) {
-    return String(value)
-  }
-  return value
-}
-const createDatasetInstances = async (instance: InstanceElement): Promise<InstanceElement> => {
-  const definitionValues = parse(instance.value.definition, {
-    attributeNamePrefix: ATTRIBUTE_PREFIX,
-    ignoreAttributes: false,
-    tagValueProcessor: val => decode(val),
-  })
+// const fetchTransformFunc = async ({ value, field }: TransformFuncArgs): Promise<Value> => {
+//   const fieldType = await field?.getType()
+//   if (_.isPlainObject(value)) {
+//     if (TYPE in value) {
+//       if (value[TYPE] === 'null') {
+//         return {}
+//       } if (value[TYPE] === 'array') {
+//         if (value[ITEM] !== undefined) {
+//           return (Array.isArray(value[ITEM])) ? value[ITEM] : [value[ITEM]]
+//         }
+//         return []
+//       } if (value[TYPE] === 'boolean') {
+//         return value[TEXT]
+//       } if (value[TYPE] === 'string') {
+//         return String(value[TEXT])
+//       }
+//     }
+//     if (T in value) {
+//       return TValuesToIgnore.has(value[T]) ? _.omit(value, T) : {
+//         [value[T]]: _.omit(value, T),
+//       }
+//     }
+//     return value
+//   }
+//   if (isString(value) && value.startsWith('custcollectiontranslations')) {
+//     const nameParts = value.split('.')
+//     if (nameParts.length === 2) {
+//       const instance = new ReferenceExpression(
+//         new ElemID(NETSUITE, 'translationcollection', 'instance', nameParts[0])
+//       )
+//       if (await instance.getResolvedValue()) {
+//         return new ReferenceExpression(
+//           instance.elemID.createNestedID('strings', 'strings', nameParts[1], 'scriptId')
+//         )
+//       }
+//     }
+//   }
+//   if (fieldType?.elemID.isEqual(BuiltinTypes.STRING.elemID)) {
+//     return String(value)
+//   }
+//   return value
+// }
 
-  const updatedValues = transformValues({
-    values: definitionValues.root,
-    type: ParsedDatasetType().type,
-    transformFunc: fetchTransformFunc,
-    strict: false,
-    pathID: instance.elemID,
-    allowEmpty: false,
-  })
+// const createDatasetInstances = async (instance: InstanceElement): Promise<InstanceElement> => {
+//   const definitionValues = parse(instance.value.definition, {
+//     attributeNamePrefix: ATTRIBUTE_PREFIX,
+//     ignoreAttributes: false,
+//     tagValueProcessor: val => decode(val),
+//   })
 
-  instance.value = {
-    ..._.omit(await updatedValues, 'name'),
-    ..._.omit(instance.value, 'definition'),
-  }
+//   const updatedValues = transformValues({
+//     values: definitionValues.root,
+//     type: ParsedDatasetType().type,
+//     transformFunc: fetchTransformFunc,
+//     strict: false,
+//     pathID: instance.elemID,
+//     allowEmpty: false,
+//   })
 
-  return instance
-}
+//   instance.value = {
+//     ..._.omit(await updatedValues, 'name'),
+//     ..._.omit(instance.value, 'definition'),
+//   }
+
+//   return instance
+// }
+
 const createEmptyObjectOfType = async (typeElem: TypeElement): Promise<Value> => {
   if (isContainerType(typeElem)) {
     // we only have lists in the type
@@ -304,9 +312,72 @@ const returnToOriginalShape = async (instance: InstanceElement): Promise<Value> 
   return instance.value
 }
 
-const filterCreator: LocalFilterCreator = () => ({
+const filterCreator: LocalFilterCreator = ({ elementsSource }) => ({
   name: 'parseDataset',
   onFetch: async elements => {
+    const fetchTransformFunc = async ({ value, field }: TransformFuncArgs): Promise<Value> => {
+      const fieldType = await field?.getType()
+      if (_.isPlainObject(value)) {
+        if (TYPE in value) {
+          if (value[TYPE] === 'null') {
+            return {}
+          } if (value[TYPE] === 'array') {
+            if (value[ITEM] !== undefined) {
+              return (Array.isArray(value[ITEM])) ? value[ITEM] : [value[ITEM]]
+            }
+            return []
+          } if (value[TYPE] === 'boolean') {
+            return value[TEXT]
+          } if (value[TYPE] === 'string') {
+            return String(value[TEXT])
+          }
+        }
+        if (T in value) {
+          return TValuesToIgnore.has(value[T]) ? _.omit(value, T) : {
+            [value[T]]: _.omit(value, T),
+          }
+        }
+        return value
+      }
+      if (isString(value) && value.startsWith('custcollectiontranslations')) {
+        const nameParts = value.split('.')
+        if (nameParts.length === 2) {
+          const instanceElemId = new ElemID(NETSUITE, 'translationcollection', 'instance', nameParts[0])
+          const instance = await elementsSource.get(instanceElemId)
+          if (instance && instance.value?.strings?.string?.[nameParts[1]]?.scriptid !== undefined) {
+            return new ReferenceExpression(instanceElemId.createNestedID('strings', 'string', nameParts[1], 'scriptid'))
+          }
+        }
+      }
+      if (fieldType?.elemID.isEqual(BuiltinTypes.STRING.elemID)) {
+        return String(value)
+      }
+      return value
+    }
+
+    const createDatasetInstances = async (instance: InstanceElement): Promise<InstanceElement> => {
+      const definitionValues = parse(instance.value.definition, {
+        attributeNamePrefix: ATTRIBUTE_PREFIX,
+        ignoreAttributes: false,
+        tagValueProcessor: val => decode(val),
+      })
+
+      const updatedValues = transformValues({
+        values: definitionValues.root,
+        type: ParsedDatasetType().type,
+        transformFunc: fetchTransformFunc,
+        strict: false,
+        pathID: instance.elemID,
+        allowEmpty: false,
+      })
+
+      instance.value = {
+        ..._.omit(await updatedValues, 'name'),
+        ..._.omit(instance.value, 'definition'),
+      }
+
+      return instance
+    }
     const { type, innerTypes } = ParsedDatasetType()
     _.remove(elements, e => isObjectType(e) && e.elemID.typeName === type.elemID.name)
     _.remove(elements, e => isObjectType(e) && e.elemID.name.startsWith(type.elemID.name))
