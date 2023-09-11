@@ -45,7 +45,8 @@ type FormulaDataType = typeof formulaDataTypeList[number]
 type Validity = typeof validityList[number]
 
 type AudienceItem = Value
-type FieldReferenceJoinTrailJoin = Value
+
+
 type ExpressionSubType = Value
 type ExpressionUiData = Value
 
@@ -72,9 +73,14 @@ export type TranslationType = {
   translationScriptId?: string
 }
 
+export type Join = {
+  id?: string
+  targetRecordType?: string
+}
+
 export type JoinTrail = {
   baseRecord?: BaseRecord
-  joins?: FieldReferenceJoinTrailJoin[]
+  joins?: Join[]
 }
 
 export type FieldReference = {
@@ -197,7 +203,7 @@ export const ParsedDatasetType = (): TypeAndInnerTypes => {
     },
     path: [constants.NETSUITE, constants.TYPES_PATH, constants.DATASET],
   })
-  innerTypes.audience = datasetAudience
+  innerTypes.datasetAudience = datasetAudience
 
   const datasetDependenciesElemID = new ElemID(constants.NETSUITE, 'dataset_dependencies')
   const datasetDependencies = createMatchingObjectType<Dependencies>({
@@ -214,7 +220,7 @@ export const ParsedDatasetType = (): TypeAndInnerTypes => {
     },
     path: [constants.NETSUITE, constants.TYPES_PATH, constants.DATASET],
   })
-  innerTypes.dependencies = datasetDependencies
+  innerTypes.datasetDependencies = datasetDependencies
 
   const datasetBaseRecordElemID = new ElemID(constants.NETSUITE, 'dataset_baseRecord')
   const datasetBaseRecord = createMatchingObjectType<BaseRecord>({
@@ -227,7 +233,20 @@ export const ParsedDatasetType = (): TypeAndInnerTypes => {
     },
     path: [constants.NETSUITE, constants.TYPES_PATH, constants.DATASET],
   })
-  innerTypes.baseRecord = datasetBaseRecord
+  innerTypes.datasetBaseRecord = datasetBaseRecord
+
+  const datasetJoinElemID = new ElemID(constants.NETSUITE, 'dataset_join')
+  const datasetJoin = createMatchingObjectType<Join>({
+    elemID: datasetJoinElemID,
+    annotations: {
+    },
+    fields: {
+      id: { refType: BuiltinTypes.STRING },
+      targetRecordType: { refType: BuiltinTypes.STRING },
+    },
+    path: [constants.NETSUITE, constants.TYPES_PATH, constants.DATASET],
+  })
+  innerTypes.datasetJoin = datasetJoin
 
   const datasetJoinTrailElemID = new ElemID(constants.NETSUITE, 'dataset_joinTrail')
   const datasetJoinTrail = createMatchingObjectType<JoinTrail>({
@@ -236,7 +255,7 @@ export const ParsedDatasetType = (): TypeAndInnerTypes => {
     },
     fields: {
       baseRecord: { refType: datasetBaseRecord },
-      joins: { refType: new ListType(BuiltinTypes.UNKNOWN) },
+      joins: { refType: new ListType(datasetJoin) },
     },
     path: [constants.NETSUITE, constants.TYPES_PATH, constants.DATASET],
   })

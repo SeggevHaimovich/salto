@@ -50,17 +50,17 @@ const originalFields = [
   'dependencies',
 ]
 
-const fieldsWithT = new Set([
-  'fieldReference',
-  'dataSetFormula',
-  'condition',
-  'filter',
-])
+// const fieldsWithT = new Set([
+//   'fieldReference',
+//   'dataSetFormula',
+//   'condition',
+//   'filter',
+// ])
 
-const notAddingFields = new Set([
-  ...fieldsWithT,
-  'fieldValidityState',
-])
+// const notAddingFields = new Set([
+//   ...fieldsWithT,
+//   'fieldValidityState',
+// ])
 
 const isNumberStr = (str: string): boolean => !Number.isNaN(Number(str))
 
@@ -77,7 +77,7 @@ const fetchTransformFunc = async (
 ): Promise<Value> => {
   const fieldType = (path?.getFullName().split('.').length === 4) ? type : await field?.getType()
   if (_.isUndefined(fieldType)) {
-    log.debug('unexpected path in the workbook type. Path: %o', path)
+    log.debug('unexpected path in analytics type. Path: %o', path)
   }
   if (_.isPlainObject(value)) {
     if (TYPE in value) {
@@ -129,14 +129,14 @@ const createAnalyticsInstances = async (
   elementsSource: ReadOnlyElementsSource,
   analyticsType: ObjectType,
 ): Promise<InstanceElement> => {
-  const definitionValues = parse(instance.value.definition, {
+  const definitionValues = _.omit(parse(instance.value.definition, {
     attributeNamePrefix: ATTRIBUTE_PREFIX,
     ignoreAttributes: false,
     tagValueProcessor: val => decode(val),
-  })
+  }).root, 'name')
 
   const updatedValues = await transformValues({
-    values: definitionValues.root,
+    values: definitionValues,
     type: analyticsType,
     transformFunc: args => fetchTransformFunc(args, elementsSource, analyticsType),
     strict: false,
@@ -183,7 +183,7 @@ const createEmptyObjectOfType = async (typeElem: TypeElement): Promise<Value> =>
   const keys = Object.keys(typeElem.fields)
   const newObject: Values = {}
   await awu(keys)
-    .filter(key => !(notAddingFields.has(key)))
+    // .filter(key => !(notAddingFields.has(key)))
     .forEach(async key => {
       const innerTypeElem = await typeElem.fields[key].getType()
       if (!(DO_NOT_ADD in innerTypeElem.annotations)) {

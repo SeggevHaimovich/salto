@@ -19,7 +19,7 @@ import { BuiltinTypes, CORE_ANNOTATIONS, ElemID, ListType, ObjectType, createRef
 import { createMatchingObjectType } from '@salto-io/adapter-utils'
 import { TypeAndInnerTypes } from '../../types/object_types'
 import * as constants from '../../constants'
-import { ApplicationId, Audience, BaseRecord, Condition, ConditionOrFilter, DEFAULT_VALUE, DO_NOT_ADD, DefinitionId, DefinitionScriptId, Dependencies, Expression, ExpressionValue, FieldOrFormula, FieldReference, Filter, Formula, FormulaFormula, JoinTrail, Meta, Operator, T, TYPE, TranslationType, XML_TYPE, codeList, formulaDataTypeList, validityList } from '../dataset_parsing/parsed_dataset'
+import { ApplicationId, Audience, BaseRecord, Condition, ConditionOrFilter, DEFAULT_VALUE, DO_NOT_ADD, DefinitionId, DefinitionScriptId, Dependencies, Expression, ExpressionValue, FieldOrFormula, FieldReference, Filter, Formula, FormulaFormula, Join, JoinTrail, Meta, Operator, T, TYPE, TranslationType, XML_TYPE, codeList, formulaDataTypeList, validityList } from '../dataset_parsing/parsed_dataset'
 import { fieldTypes } from '../../types/field_types'
 
 // const log = logger(module)
@@ -461,6 +461,19 @@ export const ParsedWorkbookType = (): TypeAndInnerTypes => {
   })
   innerTypes.workbookBaseRecord = workbookBaseRecord
 
+  const workbookJoinElemID = new ElemID(constants.NETSUITE, 'dataset_join')
+  const workbookJoin = createMatchingObjectType<Join>({
+    elemID: workbookJoinElemID,
+    annotations: {
+    },
+    fields: {
+      id: { refType: BuiltinTypes.STRING },
+      targetRecordType: { refType: BuiltinTypes.STRING },
+    },
+    path: [constants.NETSUITE, constants.TYPES_PATH, constants.DATASET],
+  })
+  innerTypes.workbookJoin = workbookJoin
+
   const workbookJoinTrailElemID = new ElemID(constants.NETSUITE, 'workbook_joinTrail')
   const workbookJoinTrail = createMatchingObjectType<JoinTrail>({
     elemID: workbookJoinTrailElemID,
@@ -468,7 +481,7 @@ export const ParsedWorkbookType = (): TypeAndInnerTypes => {
     },
     fields: {
       baseRecord: { refType: workbookBaseRecord },
-      joins: { refType: new ListType(BuiltinTypes.UNKNOWN) },
+      joins: { refType: new ListType(workbookJoin) },
     },
     path: [constants.NETSUITE, constants.TYPES_PATH, constants.WORKBOOK],
   })
