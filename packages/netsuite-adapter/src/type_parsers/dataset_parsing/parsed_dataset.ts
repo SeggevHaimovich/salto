@@ -19,30 +19,12 @@ import { TypeAndInnerTypes } from '../../types/object_types'
 import * as constants from '../../constants'
 import { fieldTypes } from '../../types/field_types'
 
-// can't deploy ownerId - do strange thing (change and stay after fetch, doesn't change the owner in the UI)
-
-// TODO change all this to just string
-// TODO add all the options to all
-export const codeList = ['AND', 'OR',
-  'ANY_OF',
-  'EMPTY', 'EMPTY_NOT', 'CONTAIN', 'CONTAIN_NOT', 'ENDWITH', 'ENDWITH_NOT', 'IS', 'IS_NOT', 'START_WITH', 'START_WITH_NOT',
-  'LESS', 'GREATER', 'EQUAL', 'EQUAL_NOT', 'GREATER_OR_EQUAL', 'LESS_OR_EQUAL', 'BETWEEN', 'BETWEEN_NOT'] as const
-const targetFieldContextNameList = ['DEFAULT', 'IDENTIFIER', 'UNCONSOLIDATED', 'HIERARCHY_IDENTIFIER'] as const
-export const formulaDataTypeList = ['INTEGER', 'BOOLEAN', 'DATE', 'DATETIME', 'FLOAT', 'STRING', 'CLOBTEXT', 'PERCENT', 'DURATION'] as const
-export const validityList = ['VALID'] // ????? could it be something else?
-
 export const DEFAULT_VALUE = 'DEFAULT_VALUE'
 export const XML_TYPE = 'XML_TYPE'
 export const DO_NOT_ADD = 'DO_NOT_ADD'
 
 export const T = '_T_'
 export const TYPE = '@_type'
-
-// should I just use string?
-type Code = typeof codeList[number]
-type TargetFieldContextName = typeof targetFieldContextNameList[number]
-type FormulaDataType = typeof formulaDataTypeList[number]
-type Validity = typeof validityList[number]
 
 type AudienceItem = Value
 
@@ -88,11 +70,11 @@ export type FieldReference = {
   joinTrail?: JoinTrail
   label?: string
   uniqueId?: string
-  fieldValidityState?: Validity
+  fieldValidityState?: string
 }
 
 export type FormulaFormula = {
-  dataType?: FormulaDataType
+  dataType?: string
   formulaSQL?: string
   id?: string
   label?: TranslationType
@@ -129,11 +111,11 @@ export type Expression = {
 }
 
 export type Operator = {
-  code?: Code
+  code?: string
 }
 
 type TargetFieldContext = {
-  name?: TargetFieldContextName
+  name?: string
 }
 
 export type Meta = {
@@ -274,7 +256,6 @@ export const ParsedDatasetType = (): TypeAndInnerTypes => {
       fieldValidityState: {
         refType: BuiltinTypes.STRING,
         annotations: {
-          [CORE_ANNOTATIONS.RESTRICTION]: createRestriction({ values: validityList }),
           [DO_NOT_ADD]: true,
         },
       },
@@ -305,7 +286,6 @@ export const ParsedDatasetType = (): TypeAndInnerTypes => {
       dataType: {
         refType: BuiltinTypes.STRING,
         annotations: {
-          [CORE_ANNOTATIONS.RESTRICTION]: createRestriction({ values: formulaDataTypeList }),
         },
       },
       formulaSQL: { refType: BuiltinTypes.STRING },
@@ -419,7 +399,6 @@ export const ParsedDatasetType = (): TypeAndInnerTypes => {
       code: {
         refType: BuiltinTypes.STRING,
         annotations: {
-          [CORE_ANNOTATIONS.RESTRICTION]: createRestriction({ values: codeList }),
           [DEFAULT_VALUE]: 'AND',
         },
       },
@@ -437,7 +416,6 @@ export const ParsedDatasetType = (): TypeAndInnerTypes => {
       name: {
         refType: BuiltinTypes.STRING,
         annotations: {
-          [CORE_ANNOTATIONS.RESTRICTION]: createRestriction({ values: targetFieldContextNameList }),
           [DEFAULT_VALUE]: 'DEFAULT',
         },
       },

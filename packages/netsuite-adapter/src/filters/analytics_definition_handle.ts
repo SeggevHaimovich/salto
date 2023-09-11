@@ -50,18 +50,6 @@ const originalFields = [
   'dependencies',
 ]
 
-// const fieldsWithT = new Set([
-//   'fieldReference',
-//   'dataSetFormula',
-//   'condition',
-//   'filter',
-// ])
-
-// const notAddingFields = new Set([
-//   ...fieldsWithT,
-//   'fieldValidityState',
-// ])
-
 const isNumberStr = (str: string): boolean => !Number.isNaN(Number(str))
 
 const cloneReportInstance = (instance: InstanceElement, type: ObjectType): InstanceElement =>
@@ -183,7 +171,6 @@ const createEmptyObjectOfType = async (typeElem: TypeElement): Promise<Value> =>
   const keys = Object.keys(typeElem.fields)
   const newObject: Values = {}
   await awu(keys)
-    // .filter(key => !(notAddingFields.has(key)))
     .forEach(async key => {
       const innerTypeElem = await typeElem.fields[key].getType()
       if (!(DO_NOT_ADD in innerTypeElem.annotations)) {
@@ -213,7 +200,7 @@ const deployTransformFunc = async (
   if (isObjectType(fieldType) && isPlainObject(value) && !(TYPE in value)) {
     if (XML_TYPE in fieldType.annotations && Object.keys(value).length === 1) {
       // eslint-disable-next-line prefer-destructuring
-      value[T] = Object.keys(value)[0] // TODO check if there is a better way
+      value[T] = Object.keys(value)[0]
     } else {
       await awu(Object.keys(fieldType.fields))
         .filter(key => !(key in value) && fieldType.fields[key].annotations.DO_NOT_ADD !== true)

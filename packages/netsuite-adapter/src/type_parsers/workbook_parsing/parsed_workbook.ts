@@ -19,7 +19,7 @@ import { BuiltinTypes, CORE_ANNOTATIONS, ElemID, ListType, ObjectType, createRef
 import { createMatchingObjectType } from '@salto-io/adapter-utils'
 import { TypeAndInnerTypes } from '../../types/object_types'
 import * as constants from '../../constants'
-import { ApplicationId, Audience, BaseRecord, Condition, ConditionOrFilter, DEFAULT_VALUE, DO_NOT_ADD, DefinitionId, DefinitionScriptId, Dependencies, Expression, ExpressionValue, FieldOrFormula, FieldReference, Filter, Formula, FormulaFormula, Join, JoinTrail, Meta, Operator, T, TYPE, TranslationType, XML_TYPE, codeList, formulaDataTypeList, validityList } from '../dataset_parsing/parsed_dataset'
+import { ApplicationId, Audience, BaseRecord, Condition, ConditionOrFilter, DEFAULT_VALUE, DO_NOT_ADD, DefinitionId, DefinitionScriptId, Dependencies, Expression, ExpressionValue, FieldOrFormula, FieldReference, Filter, Formula, FormulaFormula, Join, JoinTrail, Meta, Operator, T, TYPE, TranslationType, XML_TYPE } from '../dataset_parsing/parsed_dataset'
 import { fieldTypes } from '../../types/field_types'
 
 // const log = logger(module)
@@ -257,7 +257,6 @@ export const ParsedWorkbookType = (): TypeAndInnerTypes => {
       code: {
         refType: BuiltinTypes.STRING,
         annotations: {
-          [CORE_ANNOTATIONS.RESTRICTION]: createRestriction({ values: codeList }),
           [DEFAULT_VALUE]: 'AND',
         },
       },
@@ -500,7 +499,6 @@ export const ParsedWorkbookType = (): TypeAndInnerTypes => {
       fieldValidityState: {
         refType: BuiltinTypes.STRING,
         annotations: {
-          [CORE_ANNOTATIONS.RESTRICTION]: createRestriction({ values: validityList }),
           [DO_NOT_ADD]: true,
         },
       },
@@ -519,7 +517,6 @@ export const ParsedWorkbookType = (): TypeAndInnerTypes => {
       dataType: {
         refType: BuiltinTypes.STRING,
         annotations: {
-          [CORE_ANNOTATIONS.RESTRICTION]: createRestriction({ values: formulaDataTypeList }),
         },
       },
       formulaSQL: { refType: BuiltinTypes.STRING },
