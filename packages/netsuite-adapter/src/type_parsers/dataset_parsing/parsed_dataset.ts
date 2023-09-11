@@ -466,17 +466,6 @@ export const ParsedDatasetType = (): TypeAndInnerTypes => {
     elemID: datasetCriteriaElemID,
     annotations: {
       [XML_TYPE]: true,
-      [DEFAULT_VALUE]: {
-        [T]: 'condition',
-        condition: {
-          children: { [TYPE]: 'array' },
-          operator: { code: datasetOperator.fields.code.annotations[DEFAULT_VALUE] },
-          targetFieldContext: { name: datasetTargetFieldContext.fields.name.annotations[DEFAULT_VALUE] },
-          meta: { [TYPE]: 'null' },
-          field: { [TYPE]: 'null' },
-          fieldStateName: { [TYPE]: 'null' },
-        },
-      },
     },
     fields: {
       condition: {
@@ -524,7 +513,15 @@ export const ParsedDatasetType = (): TypeAndInnerTypes => {
       audience: { refType: datasetAudience },
       baseRecord: { refType: datasetBaseRecord },
       columns: { refType: new ListType(datasetColumn) },
-      criteria: { refType: datasetCriteria },
+      criteria: {
+        refType: datasetCriteria,
+        annotations: {
+          [DEFAULT_VALUE]: {
+            [T]: 'condition',
+            condition: {},
+          },
+        },
+      },
       description: { refType: datasetTranslation },
       formulas: { refType: new ListType(datasetFieldOrFormula) },
       id: { refType: BuiltinTypes.UNKNOWN },

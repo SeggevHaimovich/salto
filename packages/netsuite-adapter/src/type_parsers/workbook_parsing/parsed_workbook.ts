@@ -19,7 +19,7 @@ import { BuiltinTypes, CORE_ANNOTATIONS, ElemID, ListType, ObjectType, createRef
 import { createMatchingObjectType } from '@salto-io/adapter-utils'
 import { TypeAndInnerTypes } from '../../types/object_types'
 import * as constants from '../../constants'
-import { ApplicationId, Audience, BaseRecord, Condition, ConditionOrFilter, DEFAULT_VALUE, DO_NOT_ADD, DefinitionId, DefinitionScriptId, Dependencies, Expression, ExpressionValue, FieldOrFormula, FieldReference, Filter, Formula, FormulaFormula, Join, JoinTrail, Meta, Operator, T, TYPE, TranslationType, XML_TYPE } from '../dataset_parsing/parsed_dataset'
+import { ApplicationId, Audience, BaseRecord, Condition, ConditionOrFilter, DEFAULT_VALUE, DO_NOT_ADD, DefinitionId, DefinitionScriptId, Dependencies, Expression, ExpressionValue, FieldOrFormula, FieldReference, Filter, Formula, FormulaFormula, Join, JoinTrail, Meta, Operator, T, TranslationType, XML_TYPE } from '../dataset_parsing/parsed_dataset'
 import { fieldTypes } from '../../types/field_types'
 
 // const log = logger(module)
@@ -621,17 +621,6 @@ export const ParsedWorkbookType = (): TypeAndInnerTypes => {
     elemID: workbookCriterionElemID,
     annotations: {
       [XML_TYPE]: true,
-      [DEFAULT_VALUE]: {
-        [T]: 'condition',
-        condition: {
-          children: { [TYPE]: 'array' },
-          operator: { code: workbookOperator.fields.code.annotations[DEFAULT_VALUE] },
-          targetFieldContext: { name: workbookTargetFieldContext.fields.name.annotations[DEFAULT_VALUE] },
-          meta: { [TYPE]: 'null' },
-          field: { [TYPE]: 'null' },
-          fieldStateName: { [TYPE]: 'null' },
-        },
-      },
     },
     fields: {
       condition: {
@@ -660,7 +649,15 @@ export const ParsedWorkbookType = (): TypeAndInnerTypes => {
     },
     fields: {
       conditionalFormat: { refType: new ListType(workbookConditionalFormat) },
-      criterion: { refType: workbookCriterion },
+      criterion: {
+        refType: workbookCriterion,
+        annotations: {
+          [DEFAULT_VALUE]: {
+            [T]: 'condition',
+            condition: {},
+          },
+        },
+      },
       customLabel: { refType: workbookTranslation },
       dataSetColumnId: { refType: BuiltinTypes.NUMBER },
       datasetScriptId: { refType: BuiltinTypes.STRING },
@@ -677,25 +674,6 @@ export const ParsedWorkbookType = (): TypeAndInnerTypes => {
     path: [constants.NETSUITE, constants.TYPES_PATH, constants.WORKBOOK],
   })
   innerTypes.workbookColumn = workbookColumn
-
-  // const workbookVisualizationTypeBasicsElemID = new ElemID(constants.NETSUITE, 'workbook_visualization_type_basics')
-  // const workbookVisualizationTypeBasics = createMatchingObjectType<VisualizationTypeBasics>({
-  //   elemID: workbookVisualizationTypeBasicsElemID,
-  //   annotations: {
-  //   },
-  //   fields: {
-  //     applicationId: { refType: BuiltinTypes.UNKNOWN },
-  //     datasets: { refType: new ListType(BuiltinTypes.STRING) },
-  //     id: { refType: BuiltinTypes.UNKNOWN },
-  //     name: { refType: workbookTranslation },
-  //     order: { refType: BuiltinTypes.NUMBER },
-  //     scriptId: { refType: BuiltinTypes.UNKNOWN },
-  //     version: { refType: BuiltinTypes.STRING },
-  //     workbook: { refType: BuiltinTypes.STRING },
-  //   },
-  //   path: [constants.NETSUITE, constants.TYPES_PATH, constants.WORKBOOK],
-  // })
-  // innerTypes.workbookVisualizationTypeBasics = workbookVisualizationTypeBasics
 
   const workbookChartOrPivotElemID = new ElemID(constants.NETSUITE, 'workbook_chart_or_pivot')
   const workbookChartOrPivot = createMatchingObjectType<ChartOrPivot>({
