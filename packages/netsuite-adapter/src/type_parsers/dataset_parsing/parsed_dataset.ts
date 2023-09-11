@@ -273,6 +273,7 @@ export const ParsedDatasetType = (): TypeAndInnerTypes => {
   const datasetFormulaFormula = createMatchingObjectType<FormulaFormula>({
     elemID: datasetFormulaFormulaElemID,
     annotations: {
+      XML_TYPE: true,
     },
     fields: {
       dataType: {
@@ -495,6 +496,7 @@ export const ParsedDatasetType = (): TypeAndInnerTypes => {
       scriptId: { refType: BuiltinTypes.UNKNOWN },
     },
     annotations: {
+      XML_TYPE: true,
     },
     path: [constants.NETSUITE, constants.TYPES_PATH, constants.DATASET],
   })

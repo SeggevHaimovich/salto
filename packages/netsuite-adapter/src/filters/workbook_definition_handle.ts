@@ -21,10 +21,11 @@ import { parse, j2xParser } from 'fast-xml-parser'
 import { decode, encode } from 'he'
 import { collections } from '@salto-io/lowerdash'
 import { logger } from '@salto-io/logging'
-import { NETSUITE, WORKBOOK } from '../constants'
+import { DATASET, NETSUITE, WORKBOOK } from '../constants'
 import { LocalFilterCreator } from '../filter'
 import { ATTRIBUTE_PREFIX, CDATA_TAG_NAME } from '../client/constants'
 import { ParsedWorkbookType } from '../type_parsers/workbook_parsing/parsed_workbook'
+import { ParsedDatasetType } from '../type_parsers/dataset_parsing/parsed_dataset'
 
 const log = logger(module)
 
@@ -66,7 +67,7 @@ const isNumberStr = (str: string): boolean => !Number.isNaN(Number(str))
 
 const cloneReportInstance = (instance: InstanceElement, type: ObjectType): InstanceElement =>
 // We create another element not using element.clone because
-// we need the new element to have a parsed dataset type.
+// we need the new element to have a parsed analytic type.
   new InstanceElement(instance.elemID.name, type, instance.value,
     instance.path, instance.annotations)
 
@@ -96,7 +97,7 @@ const fetchTransformFunc = async (
     }
     if (T in value) {
       if (!isObjectType(fieldType) || !(XML_TYPE in fieldType.annotations)) {
-        log.debug('unexpected _T_ field in a workbook. Path: %o', path)
+        log.debug('unexpected _T_ field in analytic instance. Path: %o', path)
         return {
           xmlType: value[T],
           ..._.omit(value, T),
@@ -264,6 +265,12 @@ const checkTypeField = (key: string | number, value: Value): Value => {
 }
 
 const checkT = (key: string | number, value: Value): Value => {
+  if (key === 'formula') {
+    return {
+      _T_: 'formula',
+      ...value[key],
+    }
+  }
   const innerVal = value[key]
   if (isPlainObject(innerVal)) {
     const innerkeys = Object.keys(innerVal)
@@ -318,7 +325,7 @@ const addMissingFields = async (
 ): Promise<Values> =>
   await transformValues({
     values: definitionValues,
-    type: ParsedWorkbookType().type,
+    type: analyticsType,
     transformFunc: args => deployTransformFunc(args, analyticsType),
     strict: false,
     pathID: instance.elemID,
@@ -356,7 +363,13 @@ const returnToOriginalShape = async (instance: InstanceElement, analyticsType: O
   }
   const fullDefinitionValues = await addMissingFields(instance, definitionValues, analyticsType)
   matchToXmlObjectForm(instance, fullDefinitionValues)
-  fullDefinitionValues.Workbook[T] = 'workbook'
+
+  if (analyticsType.elemID.typeName === WORKBOOK) {
+    fullDefinitionValues.Workbook[T] = 'workbook'
+  } else {
+    fullDefinitionValues[T] = 'dataSet'
+  }
+
   fullDefinitionValues.name = instance.value.name
   if (isReferenceExpression(instance.value.name?.[TEXT])) {
     const name = instance.value.name[TEXT].elemID.getFullName()
@@ -367,6 +380,7 @@ const returnToOriginalShape = async (instance: InstanceElement, analyticsType: O
       }
     }
   }
+
   // eslint-disable-next-line new-cap
   const xmlString = new j2xParser({
     attributeNamePrefix: ATTRIBUTE_PREFIX,
@@ -388,33 +402,57 @@ const returnToOriginalShape = async (instance: InstanceElement, analyticsType: O
 }
 
 const filterCreator: LocalFilterCreator = ({ elementsSource }) => ({
-  name: 'parseWorkbook',
+  name: 'parseAnalytics',
   onFetch: async elements => {
-    const { type, innerTypes } = ParsedWorkbookType()
-    _.remove(elements, e => isObjectType(e) && e.elemID.typeName === type.elemID.name)
-    _.remove(elements, e => isObjectType(e) && e.elemID.name.startsWith(type.elemID.name))
-    const instances = _.remove(elements, e => isInstanceElement(e) && e.elemID.typeName === type.elemID.name)
-    elements.push(type)
-    elements.push(...Object.values(innerTypes))
-    const parsedInstances = (
-      instances
+    // workbook
+    const { type: workbookType, innerTypes: workbookInnerTypes } = ParsedWorkbookType()
+    _.remove(elements, e => isObjectType(e) && e.elemID.typeName === workbookType.elemID.name)
+    _.remove(elements, e => isObjectType(e) && e.elemID.name.startsWith(workbookType.elemID.name))
+    const workbookInstances = _.remove(elements, elem =>
+      isInstanceElement(elem) && elem.elemID.typeName === workbookType.elemID.name)
+    elements.push(workbookType)
+    elements.push(...Object.values(workbookInnerTypes))
+    const parsedWorkbookInstances = (
+      workbookInstances
         .filter(isInstanceElement)
-        .map(instance => cloneReportInstance(instance, type))
-        .map(instance => createAnalyticsInstances(instance, elementsSource, type)))
-    elements.push(...await Promise.all(parsedInstances))
+        .map(instance => cloneReportInstance(instance, workbookType))
+        .map(instance => createAnalyticsInstances(instance, elementsSource, workbookType)))
+    elements.push(...await Promise.all(parsedWorkbookInstances))
+
+    // dataset
+    const { type: datasetType, innerTypes: datasetInnerTypes } = ParsedDatasetType()
+    _.remove(elements, e => isObjectType(e) && e.elemID.typeName === datasetType.elemID.name)
+    _.remove(elements, e => isObjectType(e) && e.elemID.name.startsWith(datasetType.elemID.name))
+    const datasetInstances = _.remove(elements, elem =>
+      isInstanceElement(elem) && elem.elemID.typeName === datasetType.elemID.name)
+    elements.push(datasetType)
+    elements.push(...Object.values(datasetInnerTypes))
+    const parsedDatasetInstances = (
+      datasetInstances
+        .filter(isInstanceElement)
+        .map(instance => cloneReportInstance(instance, datasetType))
+        .map(instance => createAnalyticsInstances(instance, elementsSource, datasetType)))
+    elements.push(...await Promise.all(parsedDatasetInstances))
   },
+
   preDeploy: async (changes: Change[]) => {
-    await awu(changes)
+    const instanceElems = changes
       .filter(isInstanceChange)
       .map(getChangeData)
+
+    await awu(instanceElems)
       .filter(instance => instance.elemID.typeName === WORKBOOK)
       .forEach(async instance => {
         instance.value = await returnToOriginalShape(instance, ParsedWorkbookType().type)
       })
     log.debug('')
+    await awu(instanceElems)
+      .filter(instance => instance.elemID.typeName === DATASET)
+      .forEach(async instance => {
+        instance.value = await returnToOriginalShape(instance, ParsedDatasetType().type)
+      })
+    log.debug('')
   },
 })
-
-log.debug('')
 
 export default filterCreator
