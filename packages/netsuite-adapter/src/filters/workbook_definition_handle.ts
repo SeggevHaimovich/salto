@@ -14,7 +14,7 @@
 * limitations under the License.
 */
 
-import { BuiltinTypes, Change, ElemID, getChangeData, InstanceElement, isInstanceChange, isInstanceElement, isListType, isObjectType, isReferenceExpression, ObjectType, ReferenceExpression, TypeElement, Value, Values } from '@salto-io/adapter-api'
+import { BuiltinTypes, Change, ElemID, getChangeData, InstanceElement, isContainerType, isInstanceChange, isInstanceElement, isListType, isObjectType, isPrimitiveType, isReferenceExpression, ObjectType, ReadOnlyElementsSource, ReferenceExpression, TypeElement, Value, Values } from '@salto-io/adapter-api'
 import _, { isBoolean, isPlainObject, isString } from 'lodash'
 import { TransformFuncArgs, transformValues, WALK_NEXT_STEP, WalkOnFunc, walkOnValue } from '@salto-io/adapter-utils'
 import { parse, j2xParser } from 'fast-xml-parser'
@@ -37,7 +37,11 @@ const TYPE = '@_type'
 const ITEM = '_ITEM_'
 const TEXT = '#text'
 
-const TValuesToIgnore = new Set(['workbook'])
+const TValuesToIgnore = new Set([
+  'workbook',
+  'dataSet',
+  'formula',
+])
 
 const originalFields = [
   'scriptid',
@@ -45,6 +49,18 @@ const originalFields = [
   'definition',
   'dependencies',
 ]
+
+const fieldsWithT = new Set([
+  'fieldReference',
+  'dataSetFormula',
+  'condition',
+  'filter',
+])
+
+const notAddingFields = new Set([
+  ...fieldsWithT,
+  'fieldValidityState',
+])
 
 const isNumberStr = (str: string): boolean => !Number.isNaN(Number(str))
 
@@ -54,8 +70,12 @@ const cloneReportInstance = (instance: InstanceElement, type: ObjectType): Insta
   new InstanceElement(instance.elemID.name, type, instance.value,
     instance.path, instance.annotations)
 
-const fetchTransformFunc = async ({ value, field, path }: TransformFuncArgs): Promise<Value> => {
-  const fieldType = (path?.getFullName().split('.').length === 4) ? ParsedWorkbookType().type : await field?.getType()
+const fetchTransformFunc = async (
+  { value, field, path }: TransformFuncArgs,
+  elementsSource: ReadOnlyElementsSource,
+  type: ObjectType,
+): Promise<Value> => {
+  const fieldType = (path?.getFullName().split('.').length === 4) ? type : await field?.getType()
   if (_.isUndefined(fieldType)) {
     log.debug('unexpected path in the workbook type. Path: %o', path)
   }
@@ -91,8 +111,11 @@ const fetchTransformFunc = async ({ value, field, path }: TransformFuncArgs): Pr
   if (isString(value) && value.startsWith('custcollectiontranslations')) {
     const nameParts = value.split('.')
     if (nameParts.length === 2) {
-      const finalElemIdPath = `translationcollection.instance.${nameParts[0]}.strings.string.${nameParts[1]}.scriptid`
-      return new ReferenceExpression(new ElemID(NETSUITE, finalElemIdPath))
+      const instanceElemId = new ElemID(NETSUITE, 'translationcollection', 'instance', nameParts[0])
+      const instance = await elementsSource.get(instanceElemId)
+      if (instance && instance.value?.strings?.string?.[nameParts[1]]?.scriptid !== undefined) {
+        return new ReferenceExpression(instanceElemId.createNestedID('strings', 'string', nameParts[1], 'scriptid'))
+      }
     }
   }
   if (fieldType?.elemID.isEqual(BuiltinTypes.STRING.elemID)) {
@@ -100,7 +123,12 @@ const fetchTransformFunc = async ({ value, field, path }: TransformFuncArgs): Pr
   }
   return value
 }
-const createWorkbookInstances = async (instance: InstanceElement): Promise<InstanceElement> => {
+
+const createAnalyticsInstances = async (
+  instance: InstanceElement,
+  elementsSource: ReadOnlyElementsSource,
+  analyticsType: ObjectType,
+): Promise<InstanceElement> => {
   const definitionValues = parse(instance.value.definition, {
     attributeNamePrefix: ATTRIBUTE_PREFIX,
     ignoreAttributes: false,
@@ -109,17 +137,17 @@ const createWorkbookInstances = async (instance: InstanceElement): Promise<Insta
 
   const updatedValues = await transformValues({
     values: definitionValues.root,
-    type: ParsedWorkbookType().type,
-    transformFunc: fetchTransformFunc,
+    type: analyticsType,
+    transformFunc: args => fetchTransformFunc(args, elementsSource, analyticsType),
     strict: false,
     pathID: instance.elemID,
     allowEmpty: false,
   })
 
-  if (updatedValues) {
+  if (updatedValues !== undefined) {
     instance.value = {
+      ..._.omit(instance.value, 'definition'),
       ..._.omit(updatedValues, 'name'),
-      ..._.omit(instance.value, 'charts', 'pivots', 'tables', 'definition'),
     }
   }
 
@@ -127,7 +155,7 @@ const createWorkbookInstances = async (instance: InstanceElement): Promise<Insta
 }
 
 // very different from the dataset
-const createEmptyObjectOfType = async (typeElem: TypeElement): Promise<Value> => {
+const createEmptyObjectOfTypeWorkbook = async (typeElem: TypeElement): Promise<Value> => {
   if (isListType(typeElem)) {
     return {
       [TYPE]: 'array',
@@ -138,98 +166,142 @@ const createEmptyObjectOfType = async (typeElem: TypeElement): Promise<Value> =>
   }
 }
 
+const createEmptyObjectOfTypeDataset = async (typeElem: TypeElement): Promise<Value> => {
+  if (isContainerType(typeElem)) {
+    // we only have lists in the type
+    return {
+      [TYPE]: 'array',
+    }
+  }
+
+  const nullObject = {
+    [TYPE]: 'null',
+  }
+
+  if (isPrimitiveType(typeElem)) {
+    return nullObject
+  }
+
+  // it must be an object (recursive building the object)
+  const keys = Object.keys(typeElem.fields)
+  const newObject: Values = {}
+  await awu(keys)
+    .filter(key => !(notAddingFields.has(key)))
+    .forEach(async key => {
+      newObject[key] = await createEmptyObjectOfTypeDataset(await typeElem.fields[key].getType())
+    })
+
+  // object that contains only nulls should be null
+  if (Object.keys(newObject).every(key => _.isEqual(newObject[key], nullObject))) {
+    return nullObject
+  }
+  return newObject
+}
+
 const checkReferenceToTranslation = (name: string): boolean => {
   const regex = /^netsuite.translationcollection.instance.\w+.strings.string.\w+.scriptid$/
   return regex.test(name)
 }
-const deployWalkFunc: WalkOnFunc = ({ value }) => {
-  const checkReference = (key: string): Value => {
-    if (key === 'translationScriptId' && isReferenceExpression(value[key])) {
-      const name = value[key].elemID.getFullName()
-      if (checkReferenceToTranslation(name)) {
-        const nameList = name.split('.')
-        return nameList[3].concat('.', nameList[6])
-      }
-      return name
-    }
-    return value[key]
-  }
 
-  const checkTypeField = (key: string | number): Value => {
-    if (Array.isArray(value[key])) {
-      return {
-        [TYPE]: 'array',
-        [ITEM]: value[key],
-      }
-    }
-    if (isBoolean(value[key])) {
-      // eslint-disable-next-line no-param-reassign
-      return {
-        [TYPE]: 'boolean',
-        [TEXT]: String(value[key]),
-      }
-    }
-    if (isString(value[key]) && isNumberStr(value[key])) {
-      return {
-        [TYPE]: 'string',
-        [TEXT]: String(value[key]),
-      }
-    }
-    return value[key]
-  }
-
-  const checkT = (key: string | number): Value => {
-    const innerVal = value[key]
-    if (isPlainObject(innerVal)) {
-      const innerkeys = Object.keys(innerVal)
-      if (innerkeys.length === 2 && innerkeys.includes(T)) {
-        const otherKey = innerkeys.filter(innerKey => innerKey !== T)[0]
-        return {
-          [T]: innerVal[T],
-          ...innerVal[otherKey],
-        }
-      }
-    }
-    return value[key]
-  }
-
-  if (isPlainObject(value)) {
-    const keys = Object.keys(value)
-
-    keys.forEach(key => {
-      value[key] = checkT(key)
-      value[key] = checkReference(key)
-    })
-
-    if (!(TYPE in value)) {
-      keys.forEach(key => {
-        value[key] = checkTypeField(key)
-      })
-    }
-  } else if (Array.isArray(value)) {
-    value.forEach((_val, index) => {
-      value[index] = checkT(index)
-      value[index] = checkTypeField(index)
-    })
-  }
-  return WALK_NEXT_STEP.RECURSE
-}
-
-const deployTransformFunc = async ({ value, field, path }: TransformFuncArgs): Promise<Value> => {
-  const fieldType = (path?.getFullName().split('.').length === 4) ? ParsedWorkbookType().type : await field?.getType()
+const deployTransformFunc = async (
+  { value, field, path }: TransformFuncArgs,
+  analyticsType: ObjectType,
+): Promise<Value> => {
+  const fieldType = (path?.getFullName().split('.').length === 4) ? analyticsType : await field?.getType()
   if (isObjectType(fieldType) && isPlainObject(value) && !(TYPE in value)) {
     if (XML_TYPE in fieldType.annotations && Object.keys(value).length === 1) {
       // eslint-disable-next-line prefer-destructuring
       value[T] = Object.keys(value)[0] // TODO check if there is a better way
+    } else if (analyticsType.elemID.typeName === WORKBOOK) {
+      await awu(Object.keys(fieldType.fields))
+        .filter(key => !(key in value) && fieldType.fields[key].annotations.DO_NOT_ADD !== true)
+        .forEach(async key => {
+          value[key] = await createEmptyObjectOfTypeWorkbook(await fieldType.fields[key].getType())
+        })
     } else {
       await awu(Object.keys(fieldType.fields))
         .filter(key => !(key in value) && fieldType.fields[key].annotations.DO_NOT_ADD !== true)
         .forEach(async key => {
-          value[key] = await createEmptyObjectOfType(await fieldType.fields[key].getType())
+          value[key] = await createEmptyObjectOfTypeDataset(await fieldType.fields[key].getType())
         })
     }
   }
   return value
+}
+const checkReference = (key: string, value: Value): Value => {
+  if (key === 'translationScriptId' && isReferenceExpression(value[key])) {
+    const name = value[key].elemID.getFullName()
+    if (checkReferenceToTranslation(name)) {
+      const nameList = name.split('.')
+      return nameList[3].concat('.', nameList[6])
+    }
+    return name
+  }
+  return value[key]
+}
+
+const checkTypeField = (key: string | number, value: Value): Value => {
+  if (Array.isArray(value[key])) {
+    return {
+      [TYPE]: 'array',
+      [ITEM]: value[key],
+    }
+  }
+  if (isBoolean(value[key])) {
+    // eslint-disable-next-line no-param-reassign
+    return {
+      [TYPE]: 'boolean',
+      [TEXT]: String(value[key]),
+    }
+  }
+  if (isString(value[key]) && isNumberStr(value[key])) {
+    return {
+      [TYPE]: 'string',
+      [TEXT]: String(value[key]),
+    }
+  }
+  return value[key]
+}
+
+const checkT = (key: string | number, value: Value): Value => {
+  const innerVal = value[key]
+  if (isPlainObject(innerVal)) {
+    const innerkeys = Object.keys(innerVal)
+    if (innerkeys.includes('xmlType')) {
+      innerVal[T] = innerVal.xmlType
+      delete innerVal.xmlType
+    } else if (innerkeys.length === 2 && innerkeys.includes(T)) {
+      const otherKey = innerkeys.filter(innerKey => innerKey !== T)[0]
+      return {
+        [T]: innerVal[T],
+        ...innerVal[otherKey],
+      }
+    }
+  }
+  return value[key]
+}
+
+const deployWalkFunc: WalkOnFunc = ({ value }) => {
+  if (isPlainObject(value)) {
+    const keys = Object.keys(value)
+
+    keys.forEach(key => {
+      value[key] = checkT(key, value)
+      value[key] = checkReference(key, value)
+    })
+
+    if (!(TYPE in value)) {
+      keys.forEach(key => {
+        value[key] = checkTypeField(key, value)
+      })
+    }
+  } else if (Array.isArray(value)) {
+    value.forEach((_val, index) => {
+      value[index] = checkT(index, value)
+      value[index] = checkTypeField(index, value)
+    })
+  }
+  return WALK_NEXT_STEP.RECURSE
 }
 
 const matchToXmlObjectForm = (instance: InstanceElement, definitionValues: Values): void =>
@@ -239,46 +311,50 @@ const matchToXmlObjectForm = (instance: InstanceElement, definitionValues: Value
     func: deployWalkFunc,
   })
 
-const addMissingFields = async (instance: InstanceElement, definitionValues: Values): Promise<Values> =>
+const addMissingFields = async (
+  instance: InstanceElement,
+  definitionValues: Values,
+  analyticsType: ObjectType,
+): Promise<Values> =>
   await transformValues({
     values: definitionValues,
     type: ParsedWorkbookType().type,
-    transformFunc: deployTransformFunc,
+    transformFunc: args => deployTransformFunc(args, analyticsType),
     strict: false,
     pathID: instance.elemID,
   }) ?? definitionValues
 
-const createOriginalArrays = (value: Values): Values => {
-  const createOriginalArray = (arrName: string, itemName: string): Value => {
-    const valToReturn: Array<Values> = []
-    value[arrName]?.filter(isPlainObject).forEach((val: Values) => {
-      const scriptId = val[itemName]?.scriptId
-      if (scriptId !== undefined) {
-        valToReturn.push({
-          scriptid: scriptId,
-        })
-      }
-    })
-    return valToReturn
-  }
-  return {
-    pivots: {
-      pivot: createOriginalArray('pivots', 'pivot'),
-    },
-    charts: {
-      chart: createOriginalArray('charts', 'chart'),
-    },
-    tables: {
-      table: createOriginalArray('dataViews', 'dataView'),
-    },
-  }
+const createOriginalArray = (itemName: string, value: Values): Value => {
+  const arrName = `${itemName}s`
+  const valToReturn: Array<Values> = []
+  value[arrName]?.filter(isPlainObject).forEach((val: Values) => {
+    const scriptId = val[itemName]?.scriptId
+    if (scriptId !== undefined) {
+      valToReturn.push({
+        scriptid: scriptId,
+      })
+    }
+  })
+  return valToReturn
 }
 
-const returnToOriginalShape = async (instance: InstanceElement): Promise<Value> => {
+const createOriginalArrays = (value: Values): Values => ({
+  pivots: {
+    pivot: createOriginalArray('pivot', value),
+  },
+  charts: {
+    chart: createOriginalArray('chart', value),
+  },
+  tables: {
+    table: createOriginalArray('dataView', value),
+  },
+})
+
+const returnToOriginalShape = async (instance: InstanceElement, analyticsType: ObjectType): Promise<Value> => {
   const definitionValues = {
     ..._.omit(instance.value, originalFields),
   }
-  const fullDefinitionValues = await addMissingFields(instance, definitionValues)
+  const fullDefinitionValues = await addMissingFields(instance, definitionValues, analyticsType)
   matchToXmlObjectForm(instance, fullDefinitionValues)
   fullDefinitionValues.Workbook[T] = 'workbook'
   fullDefinitionValues.name = instance.value.name
@@ -300,7 +376,8 @@ const returnToOriginalShape = async (instance: InstanceElement): Promise<Value> 
     tagValueProcessor: val => encode(val.toString()),
   }).parse({ root: fullDefinitionValues })
 
-  const arrays = createOriginalArrays(instance.value)
+  const arrays = (analyticsType.elemID.typeName === WORKBOOK) ? createOriginalArrays(instance.value) : []
+
   return {
     name: instance.value.name,
     scriptid: instance.value.scriptid,
@@ -310,7 +387,7 @@ const returnToOriginalShape = async (instance: InstanceElement): Promise<Value> 
   }
 }
 
-const filterCreator: LocalFilterCreator = () => ({
+const filterCreator: LocalFilterCreator = ({ elementsSource }) => ({
   name: 'parseWorkbook',
   onFetch: async elements => {
     const { type, innerTypes } = ParsedWorkbookType()
@@ -323,7 +400,7 @@ const filterCreator: LocalFilterCreator = () => ({
       instances
         .filter(isInstanceElement)
         .map(instance => cloneReportInstance(instance, type))
-        .map(createWorkbookInstances))
+        .map(instance => createAnalyticsInstances(instance, elementsSource, type)))
     elements.push(...await Promise.all(parsedInstances))
   },
   preDeploy: async (changes: Change[]) => {
@@ -332,7 +409,7 @@ const filterCreator: LocalFilterCreator = () => ({
       .map(getChangeData)
       .filter(instance => instance.elemID.typeName === WORKBOOK)
       .forEach(async instance => {
-        instance.value = await returnToOriginalShape(instance)
+        instance.value = await returnToOriginalShape(instance, ParsedWorkbookType().type)
       })
     log.debug('')
   },

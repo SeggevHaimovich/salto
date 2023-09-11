@@ -249,6 +249,7 @@ export const ParsedDatasetType = (): TypeAndInnerTypes => {
         refType: BuiltinTypes.STRING,
         annotations: {
           [CORE_ANNOTATIONS.RESTRICTION]: createRestriction({ values: validityList }),
+          DO_NOT_ADD: true,
         },
       },
     },
@@ -306,6 +307,7 @@ export const ParsedDatasetType = (): TypeAndInnerTypes => {
   const datasetFieldOrFormula = createMatchingObjectType<FieldOrFormula>({
     elemID: datasetFieldOrFormulaElemID,
     annotations: {
+      XML_TYPE: true,
     },
     fields: {
       fieldReference: { refType: datasetFieldReference },
@@ -446,6 +448,7 @@ export const ParsedDatasetType = (): TypeAndInnerTypes => {
   const datasetCriteria = createMatchingObjectType<ConditionOrFilter>({
     elemID: datasetCriteriaElemID,
     annotations: {
+      XML_TYPE: true,
     },
     fields: {
       condition: { refType: datasetCondition },
