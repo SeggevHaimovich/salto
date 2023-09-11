@@ -14,7 +14,7 @@
 * limitations under the License.
 */
 
-import { BuiltinTypes, Change, ElemID, getChangeData, InstanceElement, isContainerType, isInstanceChange, isInstanceElement, isListType, isObjectType, isPrimitiveType, isReferenceExpression, ObjectType, ReadOnlyElementsSource, ReferenceExpression, TypeElement, Value, Values } from '@salto-io/adapter-api'
+import { BuiltinTypes, Change, ElemID, getChangeData, InstanceElement, isInstanceChange, isInstanceElement, isListType, isObjectType, isReferenceExpression, ObjectType, ReadOnlyElementsSource, ReferenceExpression, TypeElement, Value, Values } from '@salto-io/adapter-api'
 import _, { isBoolean, isPlainObject, isString } from 'lodash'
 import { TransformFuncArgs, transformValues, WALK_NEXT_STEP, WalkOnFunc, walkOnValue } from '@salto-io/adapter-utils'
 import { parse, j2xParser } from 'fast-xml-parser'
@@ -51,17 +51,17 @@ const originalFields = [
   'dependencies',
 ]
 
-const fieldsWithT = new Set([
-  'fieldReference',
-  'dataSetFormula',
-  'condition',
-  'filter',
-])
+// const fieldsWithT = new Set([
+//   'fieldReference',
+//   'dataSetFormula',
+//   'condition',
+//   'filter',
+// ])
 
-const notAddingFields = new Set([
-  ...fieldsWithT,
-  'fieldValidityState',
-])
+// const notAddingFields = new Set([
+//   ...fieldsWithT,
+//   'fieldValidityState',
+// ])
 
 const isNumberStr = (str: string): boolean => !Number.isNaN(Number(str))
 
@@ -167,37 +167,37 @@ const createEmptyObjectOfTypeWorkbook = async (typeElem: TypeElement): Promise<V
   }
 }
 
-const createEmptyObjectOfTypeDataset = async (typeElem: TypeElement): Promise<Value> => {
-  if (isContainerType(typeElem)) {
-    // we only have lists in the type
-    return {
-      [TYPE]: 'array',
-    }
-  }
+// const createEmptyObjectOfTypeDataset = async (typeElem: TypeElement): Promise<Value> => {
+//   if (isContainerType(typeElem)) {
+//     // we only have lists in the type
+//     return {
+//       [TYPE]: 'array',
+//     }
+//   }
 
-  const nullObject = {
-    [TYPE]: 'null',
-  }
+//   const nullObject = {
+//     [TYPE]: 'null',
+//   }
 
-  if (isPrimitiveType(typeElem)) {
-    return nullObject
-  }
+//   if (isPrimitiveType(typeElem)) {
+//     return nullObject
+//   }
 
-  // it must be an object (recursive building the object)
-  const keys = Object.keys(typeElem.fields)
-  const newObject: Values = {}
-  await awu(keys)
-    .filter(key => !(notAddingFields.has(key)))
-    .forEach(async key => {
-      newObject[key] = await createEmptyObjectOfTypeDataset(await typeElem.fields[key].getType())
-    })
+//   // it must be an object (recursive building the object)
+//   const keys = Object.keys(typeElem.fields)
+//   const newObject: Values = {}
+//   await awu(keys)
+//     .filter(key => !(notAddingFields.has(key)))
+//     .forEach(async key => {
+//       newObject[key] = await createEmptyObjectOfTypeDataset(await typeElem.fields[key].getType())
+//     })
 
-  // object that contains only nulls should be null
-  if (Object.keys(newObject).every(key => _.isEqual(newObject[key], nullObject))) {
-    return nullObject
-  }
-  return newObject
-}
+//   // object that contains only nulls should be null
+//   if (Object.keys(newObject).every(key => _.isEqual(newObject[key], nullObject))) {
+//     return nullObject
+//   }
+//   return newObject
+// }
 
 const checkReferenceToTranslation = (name: string): boolean => {
   const regex = /^netsuite.translationcollection.instance.\w+.strings.string.\w+.scriptid$/
@@ -213,17 +213,17 @@ const deployTransformFunc = async (
     if (XML_TYPE in fieldType.annotations && Object.keys(value).length === 1) {
       // eslint-disable-next-line prefer-destructuring
       value[T] = Object.keys(value)[0] // TODO check if there is a better way
-    } else if (analyticsType.elemID.typeName === WORKBOOK) {
-      await awu(Object.keys(fieldType.fields))
-        .filter(key => !(key in value) && fieldType.fields[key].annotations.DO_NOT_ADD !== true)
-        .forEach(async key => {
-          value[key] = await createEmptyObjectOfTypeWorkbook(await fieldType.fields[key].getType())
-        })
+    // } else if (analyticsType.elemID.typeName === DATASET) {
+    //   await awu(Object.keys(fieldType.fields))
+    //     .filter(key => !(key in value) && fieldType.fields[key].annotations.DO_NOT_ADD !== true)
+    //     .forEach(async key => {
+    //       value[key] = await createEmptyObjectOfTypeDataset(await fieldType.fields[key].getType())
+    //     })
     } else {
       await awu(Object.keys(fieldType.fields))
         .filter(key => !(key in value) && fieldType.fields[key].annotations.DO_NOT_ADD !== true)
         .forEach(async key => {
-          value[key] = await createEmptyObjectOfTypeDataset(await fieldType.fields[key].getType())
+          value[key] = await createEmptyObjectOfTypeWorkbook(await fieldType.fields[key].getType())
         })
     }
   }
