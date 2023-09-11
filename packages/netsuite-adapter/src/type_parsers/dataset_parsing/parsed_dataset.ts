@@ -31,6 +31,13 @@ const targetFieldContextNameList = ['DEFAULT', 'IDENTIFIER', 'UNCONSOLIDATED', '
 export const formulaDataTypeList = ['INTEGER', 'BOOLEAN', 'DATE', 'DATETIME', 'FLOAT', 'STRING', 'CLOBTEXT', 'PERCENT', 'DURATION'] as const
 export const validityList = ['VALID'] // ????? could it be something else?
 
+export const DEFAULT_VALUE = 'DEFAULT_VALUE'
+export const XML_TYPE = 'XML_TYPE'
+export const DO_NOT_ADD = 'DO_NOT_ADD'
+
+export const T = '_T_'
+export const TYPE = '@_type'
+
 // should I just use string?
 type Code = typeof codeList[number]
 type TargetFieldContextName = typeof targetFieldContextNameList[number]
@@ -249,7 +256,7 @@ export const ParsedDatasetType = (): TypeAndInnerTypes => {
         refType: BuiltinTypes.STRING,
         annotations: {
           [CORE_ANNOTATIONS.RESTRICTION]: createRestriction({ values: validityList }),
-          DO_NOT_ADD: true,
+          [DO_NOT_ADD]: true,
         },
       },
     },
@@ -273,7 +280,7 @@ export const ParsedDatasetType = (): TypeAndInnerTypes => {
   const datasetFormulaFormula = createMatchingObjectType<FormulaFormula>({
     elemID: datasetFormulaFormulaElemID,
     annotations: {
-      XML_TYPE: true,
+      [XML_TYPE]: true,
     },
     fields: {
       dataType: {
@@ -308,11 +315,21 @@ export const ParsedDatasetType = (): TypeAndInnerTypes => {
   const datasetFieldOrFormula = createMatchingObjectType<FieldOrFormula>({
     elemID: datasetFieldOrFormulaElemID,
     annotations: {
-      XML_TYPE: true,
+      [XML_TYPE]: true,
     },
     fields: {
-      fieldReference: { refType: datasetFieldReference },
-      dataSetFormula: { refType: datasetFormula },
+      fieldReference: {
+        refType: datasetFieldReference,
+        annotations: {
+          [DO_NOT_ADD]: true,
+        },
+      },
+      dataSetFormula: {
+        refType: datasetFormula,
+        annotations: {
+          [DO_NOT_ADD]: true,
+        },
+      },
     },
     path: [constants.NETSUITE, constants.TYPES_PATH, constants.DATASET],
   })
@@ -384,6 +401,7 @@ export const ParsedDatasetType = (): TypeAndInnerTypes => {
         refType: BuiltinTypes.STRING,
         annotations: {
           [CORE_ANNOTATIONS.RESTRICTION]: createRestriction({ values: codeList }),
+          [DEFAULT_VALUE]: 'AND',
         },
       },
     },
@@ -401,6 +419,7 @@ export const ParsedDatasetType = (): TypeAndInnerTypes => {
         refType: BuiltinTypes.STRING,
         annotations: {
           [CORE_ANNOTATIONS.RESTRICTION]: createRestriction({ values: targetFieldContextNameList }),
+          [DEFAULT_VALUE]: 'DEFAULT',
         },
       },
     },
@@ -449,11 +468,32 @@ export const ParsedDatasetType = (): TypeAndInnerTypes => {
   const datasetCriteria = createMatchingObjectType<ConditionOrFilter>({
     elemID: datasetCriteriaElemID,
     annotations: {
-      XML_TYPE: true,
+      [XML_TYPE]: true,
+      [DEFAULT_VALUE]: {
+        [T]: 'condition',
+        condition: {
+          children: { [TYPE]: 'array' },
+          operator: { code: datasetOperator.fields.code.annotations[DEFAULT_VALUE] },
+          targetFieldContext: { name: datasetTargetFieldContext.fields.name.annotations[DEFAULT_VALUE] },
+          meta: { [TYPE]: 'null' },
+          field: { [TYPE]: 'null' },
+          fieldStateName: { [TYPE]: 'null' },
+        },
+      },
     },
     fields: {
-      condition: { refType: datasetCondition },
-      filter: { refType: datasetFilter },
+      condition: {
+        refType: datasetCondition,
+        annotations: {
+          [DO_NOT_ADD]: true,
+        },
+      },
+      filter: {
+        refType: datasetFilter,
+        annotations: {
+          [DO_NOT_ADD]: true,
+        },
+      },
     },
     path: [constants.NETSUITE, constants.TYPES_PATH, constants.DATASET],
   })
@@ -496,7 +536,7 @@ export const ParsedDatasetType = (): TypeAndInnerTypes => {
       scriptId: { refType: BuiltinTypes.UNKNOWN },
     },
     annotations: {
-      XML_TYPE: true,
+      [XML_TYPE]: true,
     },
     path: [constants.NETSUITE, constants.TYPES_PATH, constants.DATASET],
   })

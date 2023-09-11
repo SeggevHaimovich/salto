@@ -14,7 +14,7 @@
 * limitations under the License.
 */
 
-import { BuiltinTypes, Change, ElemID, getChangeData, InstanceElement, isInstanceChange, isInstanceElement, isListType, isObjectType, isReferenceExpression, ObjectType, ReadOnlyElementsSource, ReferenceExpression, TypeElement, Value, Values } from '@salto-io/adapter-api'
+import { BuiltinTypes, Change, ElemID, getChangeData, InstanceElement, isContainerType, isInstanceChange, isInstanceElement, isObjectType, isPrimitiveType, isReferenceExpression, ObjectType, ReadOnlyElementsSource, ReferenceExpression, TypeElement, Value, Values } from '@salto-io/adapter-api'
 import _, { isBoolean, isPlainObject, isString } from 'lodash'
 import { TransformFuncArgs, transformValues, WALK_NEXT_STEP, WalkOnFunc, walkOnValue } from '@salto-io/adapter-utils'
 import { parse, j2xParser } from 'fast-xml-parser'
@@ -25,16 +25,15 @@ import { DATASET, NETSUITE, WORKBOOK } from '../constants'
 import { LocalFilterCreator } from '../filter'
 import { ATTRIBUTE_PREFIX, CDATA_TAG_NAME } from '../client/constants'
 import { ParsedWorkbookType } from '../type_parsers/workbook_parsing/parsed_workbook'
-import { ParsedDatasetType } from '../type_parsers/dataset_parsing/parsed_dataset'
+import { DEFAULT_VALUE, ParsedDatasetType, T, TYPE } from '../type_parsers/dataset_parsing/parsed_dataset'
 
 const log = logger(module)
 
 const XML_TYPE = 'XML_TYPE'
+const DO_NOT_ADD = 'DO_NOT_ADD'
 
 const { awu } = collections.asynciterable
 
-const T = '_T_'
-const TYPE = '@_type'
 const ITEM = '_ITEM_'
 const TEXT = '#text'
 
@@ -51,17 +50,17 @@ const originalFields = [
   'dependencies',
 ]
 
-// const fieldsWithT = new Set([
-//   'fieldReference',
-//   'dataSetFormula',
-//   'condition',
-//   'filter',
-// ])
+const fieldsWithT = new Set([
+  'fieldReference',
+  'dataSetFormula',
+  'condition',
+  'filter',
+])
 
-// const notAddingFields = new Set([
-//   ...fieldsWithT,
-//   'fieldValidityState',
-// ])
+const notAddingFields = new Set([
+  ...fieldsWithT,
+  'fieldValidityState',
+])
 
 const isNumberStr = (str: string): boolean => !Number.isNaN(Number(str))
 
@@ -155,49 +154,51 @@ const createAnalyticsInstances = async (
   return instance
 }
 
-// very different from the dataset
-const createEmptyObjectOfTypeWorkbook = async (typeElem: TypeElement): Promise<Value> => {
-  if (isListType(typeElem)) {
-    return {
-      [TYPE]: 'array',
-    }
+const createEmptyObjectOfType = async (typeElem: TypeElement): Promise<Value> => {
+  const arrayObject = {
+    [TYPE]: 'array',
   }
-  return {
+
+  const nullObject = {
     [TYPE]: 'null',
   }
+
+  if (isContainerType(typeElem)) {
+    // we only have lists in the type
+    return arrayObject
+  }
+
+  if (DEFAULT_VALUE in typeElem.annotations) {
+    return typeElem.annotations[DEFAULT_VALUE]
+  }
+
+  if (isPrimitiveType(typeElem)) {
+    return nullObject
+  }
+
+  // it must be an object (recursive building the object)
+  if (XML_TYPE in typeElem.annotations) {
+    return nullObject
+  }
+  const keys = Object.keys(typeElem.fields)
+  const newObject: Values = {}
+  await awu(keys)
+    .filter(key => !(notAddingFields.has(key)))
+    .forEach(async key => {
+      const innerTypeElem = await typeElem.fields[key].getType()
+      if (!(DO_NOT_ADD in innerTypeElem.annotations)) {
+        newObject[key] = await createEmptyObjectOfType(innerTypeElem)
+      }
+    })
+
+  // object that contains only nulls should be null
+  if (Object.keys(newObject).every(key =>
+    _.isEqual(newObject[key], nullObject)
+    || _.isEqual(newObject[key], arrayObject))) {
+    return nullObject
+  }
+  return newObject
 }
-
-// const createEmptyObjectOfTypeDataset = async (typeElem: TypeElement): Promise<Value> => {
-//   if (isContainerType(typeElem)) {
-//     // we only have lists in the type
-//     return {
-//       [TYPE]: 'array',
-//     }
-//   }
-
-//   const nullObject = {
-//     [TYPE]: 'null',
-//   }
-
-//   if (isPrimitiveType(typeElem)) {
-//     return nullObject
-//   }
-
-//   // it must be an object (recursive building the object)
-//   const keys = Object.keys(typeElem.fields)
-//   const newObject: Values = {}
-//   await awu(keys)
-//     .filter(key => !(notAddingFields.has(key)))
-//     .forEach(async key => {
-//       newObject[key] = await createEmptyObjectOfTypeDataset(await typeElem.fields[key].getType())
-//     })
-
-//   // object that contains only nulls should be null
-//   if (Object.keys(newObject).every(key => _.isEqual(newObject[key], nullObject))) {
-//     return nullObject
-//   }
-//   return newObject
-// }
 
 const checkReferenceToTranslation = (name: string): boolean => {
   const regex = /^netsuite.translationcollection.instance.\w+.strings.string.\w+.scriptid$/
@@ -213,17 +214,11 @@ const deployTransformFunc = async (
     if (XML_TYPE in fieldType.annotations && Object.keys(value).length === 1) {
       // eslint-disable-next-line prefer-destructuring
       value[T] = Object.keys(value)[0] // TODO check if there is a better way
-    // } else if (analyticsType.elemID.typeName === DATASET) {
-    //   await awu(Object.keys(fieldType.fields))
-    //     .filter(key => !(key in value) && fieldType.fields[key].annotations.DO_NOT_ADD !== true)
-    //     .forEach(async key => {
-    //       value[key] = await createEmptyObjectOfTypeDataset(await fieldType.fields[key].getType())
-    //     })
     } else {
       await awu(Object.keys(fieldType.fields))
         .filter(key => !(key in value) && fieldType.fields[key].annotations.DO_NOT_ADD !== true)
         .forEach(async key => {
-          value[key] = await createEmptyObjectOfTypeWorkbook(await fieldType.fields[key].getType())
+          value[key] = await createEmptyObjectOfType(await fieldType.fields[key].getType())
         })
     }
   }

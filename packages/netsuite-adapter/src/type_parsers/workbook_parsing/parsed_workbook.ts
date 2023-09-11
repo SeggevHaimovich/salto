@@ -19,7 +19,7 @@ import { BuiltinTypes, CORE_ANNOTATIONS, ElemID, ListType, ObjectType, createRef
 import { createMatchingObjectType } from '@salto-io/adapter-utils'
 import { TypeAndInnerTypes } from '../../types/object_types'
 import * as constants from '../../constants'
-import { ApplicationId, Audience, BaseRecord, Condition, ConditionOrFilter, DefinitionId, DefinitionScriptId, Dependencies, Expression, ExpressionValue, FieldOrFormula, FieldReference, Filter, Formula, FormulaFormula, JoinTrail, Meta, Operator, TranslationType, codeList, formulaDataTypeList, validityList } from '../dataset_parsing/parsed_dataset'
+import { ApplicationId, Audience, BaseRecord, Condition, ConditionOrFilter, DEFAULT_VALUE, DO_NOT_ADD, DefinitionId, DefinitionScriptId, Dependencies, Expression, ExpressionValue, FieldOrFormula, FieldReference, Filter, Formula, FormulaFormula, JoinTrail, Meta, Operator, T, TYPE, TranslationType, XML_TYPE, codeList, formulaDataTypeList, validityList } from '../dataset_parsing/parsed_dataset'
 import { fieldTypes } from '../../types/field_types'
 
 // const log = logger(module)
@@ -191,6 +191,7 @@ export const ParsedWorkbookType = (): TypeAndInnerTypes => {
         refType: BuiltinTypes.STRING,
         annotations: {
           [CORE_ANNOTATIONS.RESTRICTION]: createRestriction({ values: targetFieldContextNameList }),
+          [DEFAULT_VALUE]: 'DEFAULT',
         },
       },
     },
@@ -257,6 +258,7 @@ export const ParsedWorkbookType = (): TypeAndInnerTypes => {
         refType: BuiltinTypes.STRING,
         annotations: {
           [CORE_ANNOTATIONS.RESTRICTION]: createRestriction({ values: codeList }),
+          [DEFAULT_VALUE]: 'AND',
         },
       },
     },
@@ -281,10 +283,15 @@ export const ParsedWorkbookType = (): TypeAndInnerTypes => {
   const workbookFormatRuleFilter = createMatchingObjectType<FormatRuleFilter>({
     elemID: workbookFormatRuleFilterElemID,
     annotations: {
-      XML_TYPE: true,
+      [XML_TYPE]: true,
     },
     fields: {
-      conditionalFormatFilter: { refType: workbookConditionalFormatFilter },
+      conditionalFormatFilter: {
+        refType: workbookConditionalFormatFilter,
+        annotations: {
+          [DO_NOT_ADD]: true,
+        },
+      },
     },
     path: [constants.NETSUITE, constants.TYPES_PATH, constants.WORKBOOK],
   })
@@ -308,10 +315,15 @@ export const ParsedWorkbookType = (): TypeAndInnerTypes => {
   const workbookColor = createMatchingObjectType<Color>({
     elemID: workbookColorElemID,
     annotations: {
-      XML_TYPE: true,
+      [XML_TYPE]: true,
     },
     fields: {
-      rgbColor: { refType: workbookRgbColor },
+      rgbColor: {
+        refType: workbookRgbColor,
+        annotations: {
+          [DO_NOT_ADD]: true,
+        },
+      },
     },
     path: [constants.NETSUITE, constants.TYPES_PATH, constants.WORKBOOK],
   })
@@ -321,10 +333,15 @@ export const ParsedWorkbookType = (): TypeAndInnerTypes => {
   const workbookBackgroundColor = createMatchingObjectType<BackgroundColor>({
     elemID: workbookBackgroundColorElemID,
     annotations: {
-      XML_TYPE: true,
+      [XML_TYPE]: true,
     },
     fields: {
-      rgbColor: { refType: workbookRgbColor },
+      rgbColor: {
+        refType: workbookRgbColor,
+        annotations: {
+          [DO_NOT_ADD]: true,
+        },
+      },
     },
     path: [constants.NETSUITE, constants.TYPES_PATH, constants.WORKBOOK],
   })
@@ -374,10 +391,15 @@ export const ParsedWorkbookType = (): TypeAndInnerTypes => {
   const workbookFormatRule = createMatchingObjectType<FormatRule>({
     elemID: workbookFormatRuleElemID,
     annotations: {
-      XML_TYPE: true,
+      [XML_TYPE]: true,
     },
     fields: {
-      conditionalFormatRule: { refType: workbookConditionalFormatRule },
+      conditionalFormatRule: {
+        refType: workbookConditionalFormatRule,
+        annotations: {
+          [DO_NOT_ADD]: true,
+        },
+      },
     },
     path: [constants.NETSUITE, constants.TYPES_PATH, constants.WORKBOOK],
   })
@@ -400,10 +422,15 @@ export const ParsedWorkbookType = (): TypeAndInnerTypes => {
   const workbookConditionalFormat = createMatchingObjectType<ConditionalFormat>({
     elemID: workbookConditionalFormatElemID,
     annotations: {
-      XML_TYPE: true,
+      [XML_TYPE]: true,
     },
     fields: {
-      cellConditionalFormat: { refType: workbookCellConditionalFormat },
+      cellConditionalFormat: {
+        refType: workbookCellConditionalFormat,
+        annotations: {
+          [DO_NOT_ADD]: true,
+        },
+      },
     },
     path: [constants.NETSUITE, constants.TYPES_PATH, constants.WORKBOOK],
   })
@@ -461,7 +488,7 @@ export const ParsedWorkbookType = (): TypeAndInnerTypes => {
         refType: BuiltinTypes.STRING,
         annotations: {
           [CORE_ANNOTATIONS.RESTRICTION]: createRestriction({ values: validityList }),
-          DO_NOT_ADD: true,
+          [DO_NOT_ADD]: true,
         },
       },
     },
@@ -473,6 +500,7 @@ export const ParsedWorkbookType = (): TypeAndInnerTypes => {
   const workbookFormulaFormula = createMatchingObjectType<FormulaFormula>({
     elemID: workbookFormulaFormulaElemID,
     annotations: {
+      [XML_TYPE]: true,
     },
     fields: {
       dataType: {
@@ -507,11 +535,21 @@ export const ParsedWorkbookType = (): TypeAndInnerTypes => {
   const workbookFieldOrFormula = createMatchingObjectType<FieldOrFormula>({
     elemID: workbookFieldOrFormulaElemID,
     annotations: {
-      XML_TYPE: true,
+      [XML_TYPE]: true,
     },
     fields: {
-      fieldReference: { refType: workbookFieldReference },
-      dataSetFormula: { refType: workbookFormula },
+      fieldReference: {
+        refType: workbookFieldReference,
+        annotations: {
+          [DO_NOT_ADD]: true,
+        },
+      },
+      dataSetFormula: {
+        refType: workbookFormula,
+        annotations: {
+          [DO_NOT_ADD]: true,
+        },
+      },
     },
     path: [constants.NETSUITE, constants.TYPES_PATH, constants.WORKBOOK],
   })
@@ -572,11 +610,32 @@ export const ParsedWorkbookType = (): TypeAndInnerTypes => {
   const workbookCriterion = createMatchingObjectType<ConditionOrFilter>({
     elemID: workbookCriterionElemID,
     annotations: {
-      XML_TYPE: true,
+      [XML_TYPE]: true,
+      [DEFAULT_VALUE]: {
+        [T]: 'condition',
+        condition: {
+          children: { [TYPE]: 'array' },
+          operator: { code: workbookOperator.fields.code.annotations[DEFAULT_VALUE] },
+          targetFieldContext: { name: workbookTargetFieldContext.fields.name.annotations[DEFAULT_VALUE] },
+          meta: { [TYPE]: 'null' },
+          field: { [TYPE]: 'null' },
+          fieldStateName: { [TYPE]: 'null' },
+        },
+      },
     },
     fields: {
-      condition: { refType: workbookCondition },
-      filter: { refType: workbookFilter },
+      condition: {
+        refType: workbookCondition,
+        annotations: {
+          [DO_NOT_ADD]: true,
+        },
+      },
+      filter: {
+        refType: workbookFilter,
+        annotations: {
+          [DO_NOT_ADD]: true,
+        },
+      },
     },
     path: [constants.NETSUITE, constants.TYPES_PATH, constants.WORKBOOK],
   })
@@ -713,13 +772,33 @@ export const ParsedWorkbookType = (): TypeAndInnerTypes => {
   const workbookVisualizationType = createMatchingObjectType<visualizationType>({
     elemID: workbookVisualizationTypeElemID,
     annotations: {
-      XML_TYPE: true,
+      [XML_TYPE]: true,
     },
     fields: {
-      chart: { refType: workbookChartOrPivot },
-      dsLink: { refType: workbookDsLink },
-      dataView: { refType: workbookDataView },
-      pivot: { refType: workbookChartOrPivot },
+      chart: {
+        refType: workbookChartOrPivot,
+        annotations: {
+          [DO_NOT_ADD]: true,
+        },
+      },
+      dsLink: {
+        refType: workbookDsLink,
+        annotations: {
+          [DO_NOT_ADD]: true,
+        },
+      },
+      dataView: {
+        refType: workbookDataView,
+        annotations: {
+          [DO_NOT_ADD]: true,
+        },
+      },
+      pivot: {
+        refType: workbookChartOrPivot,
+        annotations: {
+          [DO_NOT_ADD]: true,
+        },
+      },
     },
     path: [constants.NETSUITE, constants.TYPES_PATH, constants.WORKBOOK],
   })
@@ -742,7 +821,7 @@ export const ParsedWorkbookType = (): TypeAndInnerTypes => {
   const workbookInnerWorkbook = createMatchingObjectType<InnerWorkbook>({
     elemID: workbookInnerWorkbookElemID,
     annotations: {
-      XML_TYPE: true,
+      [XML_TYPE]: true,
     },
     fields: {
       id: { refType: BuiltinTypes.UNKNOWN },
