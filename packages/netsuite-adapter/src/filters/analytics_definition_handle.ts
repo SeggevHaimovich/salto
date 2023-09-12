@@ -14,7 +14,7 @@
 * limitations under the License.
 */
 
-import { BuiltinTypes, Change, ElemID, getChangeData, InstanceElement, isContainerType, isInstanceChange, isInstanceElement, isObjectType, isPrimitiveType, isReferenceExpression, ObjectType, ReadOnlyElementsSource, ReferenceExpression, TypeElement, Value, Values } from '@salto-io/adapter-api'
+import { BuiltinTypes, Change, ElemID, getChangeData, InstanceElement, isContainerType, isInstanceChange, isInstanceElement, isObjectType, isPrimitiveType, isReferenceExpression, ObjectType, ReadOnlyElementsSource, ReferenceExpression, Value, Values } from '@salto-io/adapter-api'
 import _, { isBoolean, isPlainObject, isString } from 'lodash'
 import { TransformFuncArgs, transformValues, WALK_NEXT_STEP, WalkOnFunc, walkOnValue } from '@salto-io/adapter-utils'
 import { parse, j2xParser } from 'fast-xml-parser'
@@ -40,6 +40,10 @@ const TEXT = '#text'
 const TValuesToIgnore = new Set([
   'workbook',
   'dataSet',
+  'formula',
+])
+
+const keysToAddT = new Set([
   'formula',
 ])
 
@@ -142,46 +146,39 @@ const createAnalyticsInstances = async (
   return instance
 }
 
-const createEmptyObjectOfType = async (typeElem: TypeElement): Promise<Value> => {
+const createEmptyObjectOfType = async (fieldType: ObjectType, key: string): Promise<Value> => {
+  if (DEFAULT_VALUE in fieldType.fields[key].annotations) {
+    return fieldType.fields[key].annotations[DEFAULT_VALUE]
+  }
+  const keyType = await fieldType.fields[key].getType()
   const arrayObject = {
     [TYPE]: 'array',
   }
-
   const nullObject = {
     [TYPE]: 'null',
   }
-
-  if (isContainerType(typeElem)) {
+  if (isContainerType(keyType)) {
     // we only have lists in the type
     return arrayObject
   }
 
-  if (DEFAULT_VALUE in typeElem.annotations) {
-    return typeElem.annotations[DEFAULT_VALUE]
-  }
-
-  if (isPrimitiveType(typeElem)) {
+  if (isPrimitiveType(keyType) || XML_TYPE in keyType.annotations) {
     return nullObject
   }
 
-  // it must be an object (recursive building the object)
-  if (XML_TYPE in typeElem.annotations) {
-    return nullObject
-  }
-  const keys = Object.keys(typeElem.fields)
+  const innerKeys = Object.keys(keyType.fields)
   const newObject: Values = {}
-  await awu(keys)
-    .forEach(async key => {
-      const innerTypeElem = await typeElem.fields[key].getType()
-      if (!(DO_NOT_ADD in innerTypeElem.annotations)) {
-        newObject[key] = await createEmptyObjectOfType(innerTypeElem)
+  await awu(innerKeys)
+    .forEach(async innerKey => {
+      if (!(DO_NOT_ADD in keyType.fields[innerKey].annotations)) {
+        newObject[innerKey] = await createEmptyObjectOfType(keyType, innerKey)
       }
     })
 
   // object that contains only nulls should be null
-  if (Object.keys(newObject).every(key =>
-    _.isEqual(newObject[key], nullObject)
-    || _.isEqual(newObject[key], arrayObject))) {
+  if (Object.values(newObject).every(val =>
+    _.isEqual(val, nullObject)
+    || _.isEqual(val, arrayObject))) {
     return nullObject
   }
   return newObject
@@ -203,9 +200,13 @@ const deployTransformFunc = async (
       value[T] = Object.keys(value)[0]
     } else {
       await awu(Object.keys(fieldType.fields))
-        .filter(key => !(key in value) && fieldType.fields[key].annotations.DO_NOT_ADD !== true)
+        .filter(key => !(key in value) && fieldType.fields[key].annotations[DO_NOT_ADD] !== true)
         .forEach(async key => {
-          value[key] = await createEmptyObjectOfType(await fieldType.fields[key].getType())
+          if (DEFAULT_VALUE in fieldType.fields[key].annotations) {
+            value[key] = fieldType.fields[key].annotations[DEFAULT_VALUE]
+          } else {
+            value[key] = await createEmptyObjectOfType(fieldType, key)
+          }
         })
     }
   }
@@ -247,9 +248,9 @@ const checkTypeField = (key: string | number, value: Value): Value => {
 }
 
 const checkT = (key: string | number, value: Value): Value => {
-  if (key === 'formula') {
+  if (isString(key) && keysToAddT.has(key)) {
     return {
-      _T_: 'formula',
+      [T]: key,
       ...value[key],
     }
   }
@@ -279,6 +280,7 @@ const deployWalkFunc: WalkOnFunc = ({ value }) => {
       value[key] = checkReference(key, value)
     })
 
+    // to prevent endless recursion in children arrays
     if (!(TYPE in value)) {
       keys.forEach(key => {
         value[key] = checkTypeField(key, value)
@@ -433,7 +435,6 @@ const filterCreator: LocalFilterCreator = ({ elementsSource }) => ({
       .forEach(async instance => {
         instance.value = await returnToOriginalShape(instance, ParsedDatasetType().type)
       })
-    log.debug('')
   },
 })
 
