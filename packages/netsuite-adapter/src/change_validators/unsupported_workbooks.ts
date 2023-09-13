@@ -22,14 +22,14 @@ import { WORKBOOK } from '../constants'
 const unsupportedAttributes = ['charts', 'pivots', 'datasetLinks']
 
 export const checkWorkbookValidity = (workbookInstance: InstanceElement): boolean =>
-  !_.isEmpty(unsupportedAttributes.filter(attr => attr in workbookInstance))
+  _.isEmpty(unsupportedAttributes.filter(attr => attr in workbookInstance.value))
 
 const changeValidator: NetsuiteChangeValidator = async changes =>
   changes
     .filter(isInstanceChange)
     .map(getChangeData)
     .filter(inst => inst.elemID.typeName === WORKBOOK)
-    .filter(checkWorkbookValidity)
+    .filter(_.negate(checkWorkbookValidity))
     .map(({ elemID }): ChangeError => ({
       elemID,
       severity: 'Warning',

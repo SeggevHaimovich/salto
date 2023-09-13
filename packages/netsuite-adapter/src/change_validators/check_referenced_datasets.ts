@@ -14,7 +14,7 @@
 * limitations under the License.
 */
 
-import { ChangeError, InstanceElement, getChangeData, isInstanceChange, isReferenceExpression } from '@salto-io/adapter-api'
+import { ChangeError, InstanceElement, getChangeData, isInstanceChange, isInstanceElement, isReferenceExpression } from '@salto-io/adapter-api'
 import { collections } from '@salto-io/lowerdash'
 import { NetsuiteChangeValidator } from './types'
 import { DATASET, WORKBOOK } from '../constants'
@@ -51,12 +51,14 @@ const changeValidator: NetsuiteChangeValidator = async (changes, _deployReferenc
     .filter(inst => inst.elemID.typeName === DATASET)
 
   const validWorkbooks = await awu(await elementsSource.list())
-    .filter(elemID => elemID.idType === 'instance' && elemID.typeName === WORKBOOK)
+    .filter(elemID => elemID.typeName === WORKBOOK)
     .map(async elemId => elementsSource.get(elemId))
+    .filter(isInstanceElement)
     .filter(checkWorkbookValidity)
     .toArray()
 
-  return getUnreferencedDatasets(datasetChanges, validWorkbooks)
+  const bla = getUnreferencedDatasets(datasetChanges, validWorkbooks)
+  return bla
     .map(({ elemID }): ChangeError => ({
       elemID,
       severity: 'Error',
