@@ -23,7 +23,7 @@ import { transformElement, TransformFunc } from '@salto-io/adapter-utils'
 import { values as lowerDashValues, collections } from '@salto-io/lowerdash'
 import wu from 'wu'
 import os from 'os'
-import { CUSTOM_SEGMENT, DATASET, NETSUITE, SCRIPT_ID, TRANSLATION_COLLECTION, WORKBOOK } from './constants'
+import { CUSTOM_SEGMENT, NETSUITE, SCRIPT_ID, TRANSLATION_COLLECTION } from './constants'
 import { isCustomRecordType } from './types'
 
 const { awu } = collections.asynciterable
@@ -136,11 +136,11 @@ export const getRequiredReferencedElements = async (
             element.value.recordtype,
             elem => isObjectType(elem) && isCustomRecordType(elem)
           )
-        case WORKBOOK:
-          return getReferencedElement(
-            element.value.dependencies?.dependency,
-            elem => isInstanceElement(elem) && elem.elemID.typeName === DATASET
-          )
+        // case WORKBOOK:
+        //   return getReferencedElement(
+        //     element.value.dependencies?.dependency,
+        //     elem => isInstanceElement(elem) && elem.elemID.typeName === DATASET
+        //   )
         default:
           return undefined
       }

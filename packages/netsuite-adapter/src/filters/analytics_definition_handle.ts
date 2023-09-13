@@ -28,11 +28,10 @@ import { ParsedWorkbookType } from '../type_parsers/workbook_parsing/parsed_work
 import { DEFAULT_VALUE, ParsedDatasetType, T, TYPE } from '../type_parsers/dataset_parsing/parsed_dataset'
 
 const log = logger(module)
+const { awu } = collections.asynciterable
 
 const XML_TYPE = 'XML_TYPE'
 const DO_NOT_ADD = 'DO_NOT_ADD'
-
-const { awu } = collections.asynciterable
 
 const ITEM = '_ITEM_'
 const TEXT = '#text'
@@ -425,15 +424,15 @@ const filterCreator: LocalFilterCreator = ({ elementsSource }) => ({
       .map(getChangeData)
 
     await awu(instanceElems)
-      .filter(instance => instance.elemID.typeName === WORKBOOK)
-      .forEach(async instance => {
-        instance.value = await returnToOriginalShape(instance, ParsedWorkbookType().type)
-      })
-    log.debug('')
-    await awu(instanceElems)
       .filter(instance => instance.elemID.typeName === DATASET)
       .forEach(async instance => {
         instance.value = await returnToOriginalShape(instance, ParsedDatasetType().type)
+      })
+
+    await awu(instanceElems)
+      .filter(instance => instance.elemID.typeName === WORKBOOK)
+      .forEach(async instance => {
+        instance.value = await returnToOriginalShape(instance, ParsedWorkbookType().type)
       })
   },
 })

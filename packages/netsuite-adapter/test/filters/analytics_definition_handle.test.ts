@@ -13,7 +13,7 @@
 * See the License for the specific language governing permissions and
 * limitations under the License.
 */
-import { InstanceElement } from '@salto-io/adapter-api'
+import { ElemID, InstanceElement, ObjectType, isObjectType } from '@salto-io/adapter-api'
 import { buildElementsSourceFromElements } from '@salto-io/adapter-utils'
 // import { collections } from '@salto-io/lowerdash'
 import { logger } from '@salto-io/logging'
@@ -22,6 +22,8 @@ import { createEmptyElementsSourceIndexes, getDefaultAdapterConfig } from '../ut
 import { emptyDefinition } from '../type_parsers/saved_search_definition'
 import { ParsedWorkbookType } from '../../src/type_parsers/workbook_parsing/parsed_workbook'
 import { ParsedDatasetType } from '../../src/type_parsers/dataset_parsing/parsed_dataset'
+import { WORKBOOK } from '../../src/constants'
+import filterCreator from '../../src/filters/analytics_definition_handle2'
 
 const log = logger(module)
 // const { awu } = collections.asynciterable
@@ -69,5 +71,19 @@ describe('parse_report_types filter', () => {
       { definition: emptyDefinition }
     )
     log.debug('', workbookInstance, sourceWorkbookInstance, datasetInstance, sourceDatasetInstance, fetchOpts)
+
+    describe('onFetch', () => {
+      it('should removes old object type and adds new type', async () => {
+        const workbookObject = new ObjectType({ elemID: new ElemID('netsuite', WORKBOOK) })
+        const elements = [workbookObject]
+        await filterCreator(fetchOpts).onFetch?.(elements)
+        expect(elements.filter(isObjectType)
+          .filter(e => e.elemID.typeName === WORKBOOK)[0])
+          .not.toEqual(workbookObject)
+        expect(elements.filter(isObjectType)
+          .filter(e => e.elemID.typeName === WORKBOOK)[0])
+          .toEqual(ParsedWorkbookType().type)
+      })
+    })
   })
 })
