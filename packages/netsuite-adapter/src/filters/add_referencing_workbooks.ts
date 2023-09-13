@@ -14,7 +14,7 @@
 * limitations under the License.
 */
 
-import { Change, getChangeData, InstanceElement, isInstanceChange, isInstanceElement, isReferenceExpression, ReadOnlyElementsSource } from '@salto-io/adapter-api'
+import { Change, getChangeData, InstanceElement, isInstanceChange, isInstanceElement, isReferenceExpression, ReadOnlyElementsSource, toChange } from '@salto-io/adapter-api'
 import { collections } from '@salto-io/lowerdash'
 import { DATASET, WORKBOOK } from '../constants'
 import { LocalFilterCreator } from '../filter'
@@ -23,7 +23,7 @@ import { getUnreferencedDatasets } from '../change_validators/check_referenced_d
 
 const { awu } = collections.asynciterable
 
-const pushWorkbooks = async (
+const getWorkbooksToPush = async (
   datasetChanges: InstanceElement[],
   workbookChanges: InstanceElement[],
   elementsSource: ReadOnlyElementsSource
@@ -71,11 +71,11 @@ const filterCreator: LocalFilterCreator = ({ elementsSource }) => ({
       .filter(isInstanceChange)
       .map(getChangeData)
 
-    await pushWorkbooks(
+    await awu(await getWorkbooksToPush(
       instanceElems.filter(instance => instance.elemID.typeName === DATASET),
       instanceElems.filter(instance => instance.elemID.typeName === WORKBOOK),
       elementsSource,
-    )
+    )).forEach(workbook => changes.push(toChange({ before: workbook, after: workbook })))
   },
 })
 

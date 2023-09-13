@@ -50,6 +50,7 @@ describe('unreferenced dataset validator', () => {
     },
     pivots: true,
   })
+  const workbookWithoutDependencies = new InstanceElement('workbookWithoutDependencies', workbook)
 
   it('Should not have a change error when changing a dataset and a workbook referencing it', async () => {
     const changeErrors = await checkReferencedDatasets([
@@ -96,7 +97,9 @@ describe('unreferenced dataset validator', () => {
     buildElementsSourceFromElements([
       unreferencedDataset,
       referencedDataset,
+      unreferencingWorkbook,
       referencingWorkbook,
+      workbookWithoutDependencies,
     ]))
     expect(changeErrors).toHaveLength(1)
     expect(changeErrors[0].severity).toEqual('Error')

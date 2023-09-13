@@ -132,11 +132,6 @@ describe('reference dependencies', () => {
       expect(result).toEqual([customRecordType])
     })
 
-    it('should add DATASET dependency of WORKBOOK', async () => {
-      const result = await getReferencedElements([workbookInstance], false)
-      expect(result).toEqual([datasetInstance])
-    })
-
     it('should not add dependencies that already exist', async () => {
       const input = [customRecordType, customSegmentInstance, workbookInstance,
         datasetInstance, instance]

@@ -28,8 +28,7 @@ export const getUnreferencedDatasets = (
 ): InstanceElement[] => {
   const datasetElemIdFullNameSet = new Set<string>(
     datasets
-      .map(dataset => dataset.elemID.createNestedID('scriptid'))
-      .map(elemId => elemId.getFullName())
+      .map(dataset => dataset.elemID.createNestedID('scriptid').getFullName())
   )
 
   workbooks
@@ -41,15 +40,14 @@ export const getUnreferencedDatasets = (
 }
 
 const changeValidator: NetsuiteChangeValidator = async (changes, _deployReferencedElements, elementsSource) => {
-  if (elementsSource === undefined) {
-    return []
-  }
-
   const datasetChanges = changes
     .filter(isInstanceChange)
     .map(getChangeData)
     .filter(inst => inst.elemID.typeName === DATASET)
 
+  if (elementsSource === undefined || datasetChanges.length === 0) {
+    return []
+  }
   const validWorkbooks = await awu(await elementsSource.list())
     .filter(elemID => elemID.typeName === WORKBOOK)
     .map(async elemId => elementsSource.get(elemId))
@@ -57,8 +55,7 @@ const changeValidator: NetsuiteChangeValidator = async (changes, _deployReferenc
     .filter(checkWorkbookValidity)
     .toArray()
 
-  const bla = getUnreferencedDatasets(datasetChanges, validWorkbooks)
-  return bla
+  return getUnreferencedDatasets(datasetChanges, validWorkbooks)
     .map(({ elemID }): ChangeError => ({
       elemID,
       severity: 'Error',
@@ -67,6 +64,5 @@ const changeValidator: NetsuiteChangeValidator = async (changes, _deployReferenc
         + 'Therefore there must be a deployable workbook (without pivots, charts and dtalinks) in the enviorment',
     }))
 }
-
 
 export default changeValidator

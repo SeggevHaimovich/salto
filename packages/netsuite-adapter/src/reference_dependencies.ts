@@ -136,11 +136,6 @@ export const getRequiredReferencedElements = async (
             element.value.recordtype,
             elem => isObjectType(elem) && isCustomRecordType(elem)
           )
-        // case WORKBOOK:
-        //   return getReferencedElement(
-        //     element.value.dependencies?.dependency,
-        //     elem => isInstanceElement(elem) && elem.elemID.typeName === DATASET
-        //   )
         default:
           return undefined
       }
