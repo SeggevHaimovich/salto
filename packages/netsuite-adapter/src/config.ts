@@ -564,6 +564,8 @@ export type NetsuiteValidatorName = (
   | 'translationCollectionReferences'
   | 'omitFields'
   | 'unreferencedFileAddition'
+  | 'unsupportedWorkbooks'
+  | 'unreferencedDatasets'
 )
 
 export type NonSuiteAppValidatorName = (
@@ -611,6 +613,8 @@ const changeValidatorConfigType = createMatchingObjectType<ChangeValidatorConfig
     translationCollectionReferences: { refType: BuiltinTypes.BOOLEAN },
     omitFields: { refType: BuiltinTypes.BOOLEAN },
     unreferencedFileAddition: { refType: BuiltinTypes.BOOLEAN },
+    unsupportedWorkbooks: { refType: BuiltinTypes.BOOLEAN },
+    unreferencedDatasets: { refType: BuiltinTypes.BOOLEAN },
   },
   annotations: {
     [CORE_ANNOTATIONS.ADDITIONAL_PROPERTIES]: false,

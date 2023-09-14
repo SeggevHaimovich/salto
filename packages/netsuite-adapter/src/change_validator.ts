@@ -48,6 +48,8 @@ import rolePermissionValidator from './change_validators/role_permission_ids'
 import translationCollectionValidator from './change_validators/translation_collection_references'
 import omitFieldsValidator from './change_validators/omit_fields'
 import unreferencedFileAdditionValidator from './change_validators/unreferenced_file_addition'
+import unsupportedWorkbooksValidator from './change_validators/unsupported_workbooks'
+import unreferencedDatasetsValidator from './change_validators/check_referenced_datasets'
 import NetsuiteClient from './client/client'
 import {
   AdditionalDependencies,
@@ -90,6 +92,8 @@ const netsuiteChangeValidators: Record<NetsuiteValidatorName, NetsuiteChangeVali
   translationCollectionReferences: translationCollectionValidator,
   omitFields: omitFieldsValidator,
   unreferencedFileAddition: unreferencedFileAdditionValidator,
+  unsupportedWorkbooks: unsupportedWorkbooksValidator,
+  unreferencedDatasets: unreferencedDatasetsValidator,
 }
 
 const nonSuiteAppValidators: Record<NonSuiteAppValidatorName, NetsuiteChangeValidator> = {

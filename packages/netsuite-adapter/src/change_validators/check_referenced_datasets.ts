@@ -60,8 +60,7 @@ const changeValidator: NetsuiteChangeValidator = async (changes, _deployReferenc
       elemID,
       severity: 'Error',
       message: 'This dataset cannot be deployed because there is no workbook that reference it',
-      detailedMessage: 'a dataset must be deployed along side with a workbook that reference it.'
-        + 'Therefore there must be a deployable workbook (without pivots, charts and dtalinks) in the enviorment',
+      detailedMessage: 'A dataset must be deployed alongside a workbook that references it. Therefore, there must be a deployable workbook (without pivots, charts, and datasetLinks) in the environment.',
     }))
 }
 

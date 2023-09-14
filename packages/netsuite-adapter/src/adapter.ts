@@ -44,6 +44,7 @@ import dataInstancesAttributes from './filters/data_instances_attributes'
 import dataInstancesNullFields from './filters/data_instances_null_fields'
 import dataInstancesDiff from './filters/data_instances_diff'
 import dataInstancesIdentifiers from './filters/data_instances_identifiers'
+// import addReferencingWorkbooks from './filters/add_referencing_workbooks'
 import analyticsDefinitionHandle from './filters/analytics_definition_handle'
 import suiteAppInternalIds from './filters/internal_ids/suite_app_internal_ids'
 import SDFInternalIds from './filters/internal_ids/sdf_internal_ids'
@@ -111,7 +112,6 @@ export const allFilters: (LocalFilterCreatorDefinition | RemoteFilterCreatorDefi
   { creator: dataTypesCustomFields },
   { creator: dataInstancesCustomFields },
   { creator: dataInstancesNullFields },
-  // { creator: datasetDefinitionHandle },
   { creator: analyticsDefinitionHandle },
   { creator: removeUnsupportedTypes },
   { creator: dataInstancesReferences },
@@ -134,8 +134,10 @@ export const allFilters: (LocalFilterCreatorDefinition | RemoteFilterCreatorDefi
   { creator: addBundleReferences },
   // omitFieldsFilter should be the last onFetch filter to run
   { creator: omitFieldsFilter },
-  // additionalChanges should be the first preDeploy filter to run
+  // additionalChanges should be the second preDeploy filter to run
   { creator: additionalChanges },
+  // addReferencingWorkbooks should be the first preDeploy filter to run
+  // { creator: addReferencingWorkbooks },
 ]
 
 // By default we run all filters and provide a client

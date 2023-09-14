@@ -33,7 +33,7 @@ const changeValidator: NetsuiteChangeValidator = async changes =>
     .map(({ elemID }): ChangeError => ({
       elemID,
       severity: 'Warning',
-      message: 'This workbook contains pivots, charts, or data links and cannot be deployed',
+      message: 'The deployment of this workbook will probably not have an effect on the target environment as this workbook contains pivots, charts, or data links.',
       detailedMessage: 'Deployment of workbooks that contain pivots, charts, or data links is not supported',
     }))
 
