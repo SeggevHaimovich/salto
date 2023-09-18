@@ -20,6 +20,7 @@ import { DATASET, WORKBOOK } from '../constants'
 import { LocalFilterCreator } from '../filter'
 import { checkWorkbookValidity } from '../change_validators/unsupported_workbooks'
 import { getUnreferencedDatasets } from '../change_validators/check_referenced_datasets'
+import { addInnerReferencesTopLevelParent } from '../reference_dependencies'
 
 const { awu } = collections.asynciterable
 
@@ -56,6 +57,8 @@ const getWorkbooksToPush = async (
             }
           })
         if (startSizeOfSet > datasetFullNameSet.size) {
+          // eslint-disable-next-line no-await-in-loop
+          workbook.value = await addInnerReferencesTopLevelParent(workbook.value, elementsSource)
           workbooksToPush.push(workbook)
         }
       }

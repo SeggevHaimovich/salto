@@ -21,7 +21,7 @@ import { LocalFilterCreator } from '../filter'
 import { DEFAULT_DEPLOY_REFERENCED_ELEMENTS } from '../config'
 import { isStandardInstanceOrCustomRecordType } from '../types'
 
-const filterCreator: LocalFilterCreator = ({ config }) => ({
+const filterCreator: LocalFilterCreator = ({ config, elementsSource }) => ({
   name: 'additionalChanges',
   preDeploy: async changes => {
     const sdfChangesData = changes
@@ -40,7 +40,8 @@ const filterCreator: LocalFilterCreator = ({ config }) => ({
 
     const requiredElements = (await getReferencedElements(
       typesAndInstances.concat(fieldsParents),
-      config.deploy?.deployReferencedElements ?? config.deployReferencedElements ?? DEFAULT_DEPLOY_REFERENCED_ELEMENTS
+      config.deploy?.deployReferencedElements ?? config.deployReferencedElements ?? DEFAULT_DEPLOY_REFERENCED_ELEMENTS,
+      elementsSource,
     )).map(elem => elem.clone())
 
     const additionalChanges = requiredElements.concat(fieldsParents)

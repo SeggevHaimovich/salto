@@ -340,7 +340,10 @@ const createOriginalArrays = (value: Values): Values => ({
   },
 })
 
-const returnToOriginalShape = async (instance: InstanceElement, analyticsType: ObjectType): Promise<Value> => {
+const returnToOriginalShape = async (
+  instance: InstanceElement,
+  analyticsType: ObjectType,
+): Promise<Value> => {
   const definitionValues = {
     ..._.omit(instance.value, originalFields),
   }

@@ -15,11 +15,8 @@
 */
 import _ from 'lodash'
 import { logger } from '@salto-io/logging'
-import {
-  isInstanceElement, isPrimitiveType, ElemID, getFieldType,
-  isReferenceExpression, Value, isServiceId, isObjectType, ChangeDataType, ObjectType, InstanceElement,
-} from '@salto-io/adapter-api'
-import { transformElement, TransformFunc } from '@salto-io/adapter-utils'
+import { isInstanceElement, isPrimitiveType, ElemID, getFieldType, isReferenceExpression, Value, isServiceId, isObjectType, ChangeDataType, ObjectType, InstanceElement, ReadOnlyElementsSource, Values } from '@salto-io/adapter-api'
+import { transformElement, TransformFunc, transformValues } from '@salto-io/adapter-utils'
 import { values as lowerDashValues, collections } from '@salto-io/lowerdash'
 import wu from 'wu'
 import os from 'os'
@@ -30,6 +27,25 @@ const { awu } = collections.asynciterable
 const { isDefined } = lowerDashValues
 const log = logger(module)
 
+export const addInnerReferencesTopLevelParent = async (
+  elem: Values,
+  elementsSource: ReadOnlyElementsSource,
+): Promise<Value> => {
+  const transFunc:TransformFunc = async ({ value }) => {
+    if (isReferenceExpression(value) && value.topLevelParent === undefined) {
+      value.topLevelParent = await elementsSource.get(value.elemID.createTopLevelParentID().parent)
+    }
+    return value
+  }
+
+  return await transformValues({
+    values: elem,
+    type: new ObjectType({ elemID: new ElemID(NETSUITE) }),
+    transformFunc: transFunc,
+    strict: false,
+  }) ?? elem
+}
+
 type TopLevelElement = ObjectType | InstanceElement
 const isTopLevelElement = (value: unknown): value is TopLevelElement =>
   isObjectType(value) || isInstanceElement(value)
@@ -37,7 +53,8 @@ const isTopLevelElement = (value: unknown): value is TopLevelElement =>
 const elementFullName = (element: ChangeDataType): string => element.elemID.getFullName()
 
 export const findDependingElementsFromRefs = async (
-  element: ChangeDataType
+  element: ChangeDataType,
+  elementsSource?: ReadOnlyElementsSource | undefined,
 ): Promise<TopLevelElement[]> => {
   const visitedIdToElement = new Map<string, TopLevelElement>()
   const isRefToServiceId = async (
@@ -61,6 +78,9 @@ export const findDependingElementsFromRefs = async (
         && !visitedIdToElement.has(elementFullName(topLevelParent))
         && elemID.adapter === NETSUITE
         && await isRefToServiceId(topLevelParent, elemID)) {
+        if (isInstanceElement(topLevelParent) && elementsSource !== undefined) {
+          topLevelParent.value = await addInnerReferencesTopLevelParent(topLevelParent.value, elementsSource)
+        }
         visitedIdToElement.set(elementFullName(topLevelParent), topLevelParent)
       }
     }
@@ -81,13 +101,14 @@ export const findDependingElementsFromRefs = async (
  * Here we add automatically all of the referenced elements (recursively).
  */
 const getAllReferencedElements = async (
-  sourceElements: ReadonlyArray<ChangeDataType>
+  sourceElements: ReadonlyArray<ChangeDataType>,
+  elementsSource: ReadOnlyElementsSource | undefined,
 ): Promise<ReadonlyArray<TopLevelElement>> => {
   const visited = new Set<string>(sourceElements.map(elementFullName))
   const getNewReferencedElement = async (
     element: ChangeDataType
   ): Promise<TopLevelElement[]> => {
-    const newElements = (await findDependingElementsFromRefs(element))
+    const newElements = (await findDependingElementsFromRefs(element, elementsSource))
       .filter(elem => !visited.has(elementFullName(elem)))
     newElements.forEach(elem => {
       log.debug(`adding referenced element: ${elementFullName(elem)}`)
@@ -107,7 +128,8 @@ const getAllReferencedElements = async (
  * Here we add manually all of the quirks we identified.
  */
 export const getRequiredReferencedElements = async (
-  sourceElements: ReadonlyArray<ChangeDataType>
+  sourceElements: ReadonlyArray<ChangeDataType>,
+  elementsSource?: ReadOnlyElementsSource | undefined,
 ): Promise<ReadonlyArray<TopLevelElement>> => {
   const getReferencedElement = (
     value: Value,
@@ -157,7 +179,7 @@ export const getRequiredReferencedElements = async (
   // must be included in the SDF project.
   const referencedTranslationCollectionInstances = _.uniqBy(
     await awu(elements)
-      .flatMap(findDependingElementsFromRefs)
+      .flatMap(element => findDependingElementsFromRefs(element, elementsSource))
       .filter(isInstanceElement)
       .filter(element => element.elemID.typeName === TRANSLATION_COLLECTION)
       .filter(element => !elementsSet.has(elementFullName(element)))
@@ -174,9 +196,10 @@ export const getRequiredReferencedElements = async (
 
 export const getReferencedElements = async (
   elements: ReadonlyArray<ChangeDataType>,
-  deployAllReferencedElements: boolean
+  deployAllReferencedElements: boolean,
+  elementsSource?: ReadOnlyElementsSource,
 ): Promise<ReadonlyArray<TopLevelElement>> => (
   deployAllReferencedElements
-    ? getAllReferencedElements(elements)
-    : getRequiredReferencedElements(elements)
+    ? getAllReferencedElements(elements, elementsSource)
+    : getRequiredReferencedElements(elements, elementsSource)
 )
