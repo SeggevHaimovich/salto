@@ -566,6 +566,7 @@ export type NetsuiteValidatorName = (
   | 'unreferencedFileAddition'
   | 'unsupportedWorkbooks'
   | 'unreferencedDatasets'
+  | 'analyticsSilentFailure'
 )
 
 export type NonSuiteAppValidatorName = (
@@ -615,6 +616,7 @@ const changeValidatorConfigType = createMatchingObjectType<ChangeValidatorConfig
     unreferencedFileAddition: { refType: BuiltinTypes.BOOLEAN },
     unsupportedWorkbooks: { refType: BuiltinTypes.BOOLEAN },
     unreferencedDatasets: { refType: BuiltinTypes.BOOLEAN },
+    analyticsSilentFailure: { refType: BuiltinTypes.BOOLEAN },
   },
   annotations: {
     [CORE_ANNOTATIONS.ADDITIONAL_PROPERTIES]: false,
