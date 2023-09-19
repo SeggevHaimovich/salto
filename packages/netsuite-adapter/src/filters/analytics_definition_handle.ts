@@ -14,7 +14,7 @@
 * limitations under the License.
 */
 
-import { BuiltinTypes, Change, ElemID, getChangeData, InstanceElement, isContainerType, isInstanceChange, isInstanceElement, isObjectType, isPrimitiveType, isReferenceExpression, ObjectType, ReadOnlyElementsSource, ReferenceExpression, Value, Values } from '@salto-io/adapter-api'
+import { BuiltinTypes, Change, Element, ElemID, getChangeData, InstanceElement, isContainerType, isInstanceChange, isInstanceElement, isObjectType, isPrimitiveType, isReferenceExpression, ObjectType, ReadOnlyElementsSource, ReferenceExpression, Value, Values } from '@salto-io/adapter-api'
 import _, { isBoolean, isPlainObject, isString } from 'lodash'
 import { TransformFuncArgs, transformValues, WALK_NEXT_STEP, WalkOnFunc, walkOnValue } from '@salto-io/adapter-utils'
 import { parse, j2xParser } from 'fast-xml-parser'
@@ -25,7 +25,8 @@ import { DATASET, NETSUITE, WORKBOOK } from '../constants'
 import { LocalFilterCreator } from '../filter'
 import { ATTRIBUTE_PREFIX, CDATA_TAG_NAME } from '../client/constants'
 import { ParsedWorkbookType } from '../type_parsers/workbook_parsing/parsed_workbook'
-import { DEFAULT_VALUE, ParsedDatasetType, T, TYPE } from '../type_parsers/dataset_parsing/parsed_dataset'
+import { DEFAULT_VALUE, IGNORE_T_VALUE, ParsedDatasetType, T, TYPE } from '../type_parsers/dataset_parsing/parsed_dataset'
+import { TypeAndInnerTypes } from '../types/object_types'
 
 const log = logger(module)
 const { awu } = collections.asynciterable
@@ -56,14 +57,15 @@ const originalFields = [
 const isNumberStr = (str: string): boolean => !Number.isNaN(Number(str))
 
 const cloneReportInstance = (instance: InstanceElement, type: ObjectType): InstanceElement =>
-// We create another element not using element.clone because
-// we need the new element to have a parsed analytic type.
+  // We create another element not using element.clone because
+  // we need the new element to have a parsed analytic type.
   new InstanceElement(instance.elemID.name, type, instance.value,
     instance.path, instance.annotations)
 
 const fetchTransformFunc = async (
   { value, field, path }: TransformFuncArgs,
   elementsSource: ReadOnlyElementsSource,
+  elements: Element[],
   type: ObjectType,
 ): Promise<Value> => {
   const fieldType = (path?.getFullName().split('.').length === 4) ? type : await field?.getType()
@@ -103,7 +105,9 @@ const fetchTransformFunc = async (
     const nameParts = value.split('.')
     if (nameParts.length === 2) {
       const instanceElemId = new ElemID(NETSUITE, 'translationcollection', 'instance', nameParts[0])
+      const fullName = instanceElemId.getFullName()
       const instance = await elementsSource.get(instanceElemId)
+        ?? elements.find(e => e.elemID.getFullName() === fullName) // not very officient, can I do better?
       if (instance && instance.value?.strings?.string?.[nameParts[1]]?.scriptid !== undefined) {
         return new ReferenceExpression(instanceElemId.createNestedID('strings', 'string', nameParts[1], 'scriptid'))
       }
@@ -118,6 +122,7 @@ const fetchTransformFunc = async (
 const createAnalyticsInstances = async (
   instance: InstanceElement,
   elementsSource: ReadOnlyElementsSource,
+  elements: Element[],
   analyticsType: ObjectType,
 ): Promise<InstanceElement> => {
   const definitionValues = _.omit(parse(instance.value.definition, {
@@ -129,7 +134,7 @@ const createAnalyticsInstances = async (
   const updatedValues = await transformValues({
     values: definitionValues,
     type: analyticsType,
-    transformFunc: args => fetchTransformFunc(args, elementsSource, analyticsType),
+    transformFunc: args => fetchTransformFunc(args, elementsSource, elements, analyticsType),
     strict: false,
     pathID: instance.elemID,
     allowEmpty: false,
@@ -157,11 +162,12 @@ const createEmptyObjectOfType = async (fieldType: ObjectType, key: string): Prom
     [TYPE]: 'null',
   }
   if (isContainerType(keyType)) {
-    // we only have lists in the type
+    // we only have lists in the types
     return arrayObject
   }
 
-  if (isPrimitiveType(keyType) || XML_TYPE in keyType.annotations) {
+  if (isPrimitiveType(keyType)
+    || (XML_TYPE in keyType.annotations && !(IGNORE_T_VALUE in keyType.annotations))) {
     return nullObject
   }
 
@@ -390,35 +396,25 @@ const returnToOriginalShape = async (
 const filterCreator: LocalFilterCreator = ({ elementsSource }) => ({
   name: 'parseAnalytics',
   onFetch: async elements => {
-    // workbook
-    const { type: workbookType, innerTypes: workbookInnerTypes } = ParsedWorkbookType()
-    _.remove(elements, e => isObjectType(e) && e.elemID.typeName === workbookType.elemID.name)
-    _.remove(elements, e => isObjectType(e) && e.elemID.name.startsWith(workbookType.elemID.name))
-    const workbookInstances = _.remove(elements, elem =>
-      isInstanceElement(elem) && elem.elemID.typeName === workbookType.elemID.name)
-    elements.push(workbookType)
-    elements.push(...Object.values(workbookInnerTypes))
-    const parsedWorkbookInstances = (
-      workbookInstances
-        .filter(isInstanceElement)
-        .map(instance => cloneReportInstance(instance, workbookType))
-        .map(instance => createAnalyticsInstances(instance, elementsSource, workbookType)))
-    elements.push(...await Promise.all(parsedWorkbookInstances))
+    const changeType = async ({ type: analyticType, innerTypes }: TypeAndInnerTypes): Promise<void> => {
+      _.remove(elements, e => isObjectType(e) && e.elemID.typeName === analyticType.elemID.name)
+      _.remove(elements, e => isObjectType(e) && e.elemID.name.startsWith(analyticType.elemID.name))
+      const analyticInstances = _.remove(elements, elem =>
+        isInstanceElement(elem) && elem.elemID.typeName === analyticType.elemID.name)
+      elements.push(analyticType)
+      elements.push(...Object.values(innerTypes))
+      const parsedAnalyticInstances = (
+        analyticInstances
+          .filter(isInstanceElement)
+          .map(instance => cloneReportInstance(instance, analyticType))
+          .map(instance => createAnalyticsInstances(instance, elementsSource, elements, analyticType)))
+      elements.push(...await Promise.all(parsedAnalyticInstances))
+    }
+    // workbooks
+    await changeType(ParsedWorkbookType())
 
-    // dataset
-    const { type: datasetType, innerTypes: datasetInnerTypes } = ParsedDatasetType()
-    _.remove(elements, e => isObjectType(e) && e.elemID.typeName === datasetType.elemID.name)
-    _.remove(elements, e => isObjectType(e) && e.elemID.name.startsWith(datasetType.elemID.name))
-    const datasetInstances = _.remove(elements, elem =>
-      isInstanceElement(elem) && elem.elemID.typeName === datasetType.elemID.name)
-    elements.push(datasetType)
-    elements.push(...Object.values(datasetInnerTypes))
-    const parsedDatasetInstances = (
-      datasetInstances
-        .filter(isInstanceElement)
-        .map(instance => cloneReportInstance(instance, datasetType))
-        .map(instance => createAnalyticsInstances(instance, elementsSource, datasetType)))
-    elements.push(...await Promise.all(parsedDatasetInstances))
+    // datasets
+    await changeType(ParsedDatasetType())
   },
 
   preDeploy: async (changes: Change[]) => {

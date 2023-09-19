@@ -19,7 +19,7 @@ import { BuiltinTypes, CORE_ANNOTATIONS, ElemID, ListType, ObjectType, createRef
 import { createMatchingObjectType } from '@salto-io/adapter-utils'
 import { TypeAndInnerTypes } from '../../types/object_types'
 import * as constants from '../../constants'
-import { ApplicationId, Audience, BaseRecord, Condition, ConditionOrFilter, DEFAULT_VALUE, DO_NOT_ADD, DefinitionId, DefinitionScriptId, Dependencies, Expression, ExpressionValue, FieldOrFormula, FieldReference, Filter, Formula, FormulaFormula, Join, JoinTrail, Meta, Operator, T, TranslationType, XML_TYPE } from '../dataset_parsing/parsed_dataset'
+import { ApplicationId, Audience, BaseRecord, Condition, ConditionOrFilter, DEFAULT_VALUE, DO_NOT_ADD, DefinitionId, DefinitionScriptId, Dependencies, Expression, ExpressionValue, FieldOrFormula, FieldReference, Filter, Formula, FormulaFormula, IGNORE_T_VALUE, Join, JoinTrail, Meta, Operator, T, TranslationType, XML_TYPE } from '../dataset_parsing/parsed_dataset'
 import { fieldTypes } from '../../types/field_types'
 
 // const log = logger(module)
@@ -511,7 +511,8 @@ export const ParsedWorkbookType = (): TypeAndInnerTypes => {
   const workbookFormulaFormula = createMatchingObjectType<FormulaFormula>({
     elemID: workbookFormulaFormulaElemID,
     annotations: {
-      [XML_TYPE]: true,
+      [XML_TYPE]: 'formula',
+      [IGNORE_T_VALUE]: true,
     },
     fields: {
       dataType: {
@@ -799,7 +800,12 @@ export const ParsedWorkbookType = (): TypeAndInnerTypes => {
     },
     fields: {
       AudienceItems: { refType: new ListType(BuiltinTypes.UNKNOWN) },
-      isPublic: { refType: BuiltinTypes.BOOLEAN },
+      isPublic: {
+        refType: BuiltinTypes.BOOLEAN,
+        annotations: {
+          [DEFAULT_VALUE]: false,
+        },
+      },
     },
     path: [constants.NETSUITE, constants.TYPES_PATH, constants.WORKBOOK],
   })
@@ -809,7 +815,8 @@ export const ParsedWorkbookType = (): TypeAndInnerTypes => {
   const workbookInnerWorkbook = createMatchingObjectType<InnerWorkbook>({
     elemID: workbookInnerWorkbookElemID,
     annotations: {
-      [XML_TYPE]: true,
+      [XML_TYPE]: 'workbook',
+      [IGNORE_T_VALUE]: true,
     },
     fields: {
       id: { refType: BuiltinTypes.UNKNOWN },

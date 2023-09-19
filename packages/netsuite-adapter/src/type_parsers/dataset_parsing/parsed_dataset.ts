@@ -22,6 +22,7 @@ import { fieldTypes } from '../../types/field_types'
 export const DEFAULT_VALUE = 'DEFAULT_VALUE'
 export const XML_TYPE = 'XML_TYPE'
 export const DO_NOT_ADD = 'DO_NOT_ADD'
+export const IGNORE_T_VALUE = 'IGNORE_T_VALUE'
 
 export const T = '_T_'
 export const TYPE = '@_type'
@@ -280,7 +281,8 @@ export const ParsedDatasetType = (): TypeAndInnerTypes => {
   const datasetFormulaFormula = createMatchingObjectType<FormulaFormula>({
     elemID: datasetFormulaFormulaElemID,
     annotations: {
-      [XML_TYPE]: true,
+      [XML_TYPE]: 'formula',
+      [IGNORE_T_VALUE]: true,
     },
     fields: {
       dataType: {
@@ -491,6 +493,10 @@ export const ParsedDatasetType = (): TypeAndInnerTypes => {
   const datasetElemID = new ElemID(constants.NETSUITE, 'dataset')
   const dataset = createMatchingObjectType<ParsedDataset>({
     elemID: datasetElemID,
+    annotations: {
+      [XML_TYPE]: 'dataSet',
+      [IGNORE_T_VALUE]: true,
+    },
     fields: {
       scriptid: {
         refType: BuiltinTypes.SERVICE_ID,
@@ -528,9 +534,6 @@ export const ParsedDatasetType = (): TypeAndInnerTypes => {
       ownerId: { refType: BuiltinTypes.NUMBER },
       version: { refType: BuiltinTypes.STRING },
       scriptId: { refType: BuiltinTypes.UNKNOWN },
-    },
-    annotations: {
-      [XML_TYPE]: true,
     },
     path: [constants.NETSUITE, constants.TYPES_PATH, constants.DATASET],
   })
