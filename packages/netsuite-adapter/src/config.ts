@@ -567,6 +567,7 @@ export type NetsuiteValidatorName = (
   | 'translationCollectionReferences'
   | 'omitFields'
   | 'unreferencedFileAddition'
+  | 'removeListItemWithoutScriptId'
 )
 
 export type NonSuiteAppValidatorName = (
@@ -614,6 +615,7 @@ const changeValidatorConfigType = createMatchingObjectType<ChangeValidatorConfig
     translationCollectionReferences: { refType: BuiltinTypes.BOOLEAN },
     omitFields: { refType: BuiltinTypes.BOOLEAN },
     unreferencedFileAddition: { refType: BuiltinTypes.BOOLEAN },
+    removeListItemWithoutScriptId: { refType: BuiltinTypes.BOOLEAN },
   },
   annotations: {
     [CORE_ANNOTATIONS.ADDITIONAL_PROPERTIES]: false,
