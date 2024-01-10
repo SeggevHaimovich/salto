@@ -13,13 +13,13 @@
 * See the License for the specific language governing permissions and
 * limitations under the License.
 */
-import { Element, isInstanceElement, ElemID, ReferenceExpression, CORE_ANNOTATIONS, ReadOnlyElementsSource, isObjectType, getChangeData, InstanceElement, ObjectType } from '@salto-io/adapter-api'
-import { extendGeneratedDependencies, resolveValues, transformElement, TransformFunc } from '@salto-io/adapter-utils'
+import { Element, isInstanceElement, ElemID, ReferenceExpression, CORE_ANNOTATIONS, ReadOnlyElementsSource, isObjectType, getChangeData, InstanceElement, ObjectType, Value } from '@salto-io/adapter-api'
+import { extendGeneratedDependencies, resolveValues, transformElement, TransformFunc, WALK_NEXT_STEP, WalkOnFunc, walkOnValue } from '@salto-io/adapter-utils'
 import _ from 'lodash'
 import { collections, values } from '@salto-io/lowerdash'
 import osPath from 'path'
 import { logger } from '@salto-io/logging'
-import { SCRIPT_ID, PATH, FILE_CABINET_PATH_SEPARATOR } from '../constants'
+import { SCRIPT_ID, PATH, FILE_CABINET_PATH_SEPARATOR, WORKBOOK, DATASET } from '../constants'
 import { LocalFilterCreator } from '../filter'
 import { isCustomRecordType, isStandardType, isFileCabinetType, isFileInstance, isFileCabinetInstance, isCustomFieldName } from '../types'
 import { ElemServiceID, LazyElementsSourceIndexes, ServiceIdRecords } from '../elements_source_index/types'
@@ -28,6 +28,7 @@ import { isSdfCreateOrUpdateGroupId } from '../group_changes'
 import { getLookUpName } from '../transformer'
 import { getGroupItemFromRegex } from '../client/utils'
 import { getContent } from '../client/suiteapp_client/suiteapp_file_cabinet'
+import { DEPENDENCIES, NAME } from '../type_parsers/analytics_parsers/analytics_constants'
 
 const { awu } = collections.asynciterable
 const { isDefined } = values
@@ -180,6 +181,19 @@ const replaceReferenceValues = async (
       }
       dependenciesToAdd.push(elemID)
     })
+    if (
+      (element.elemID.typeName === WORKBOOK || element.elemID.typeName === DATASET)
+      && _.isString(returnValue)
+      && /^custcollection\w*\.\w*$/.test(returnValue)
+    ) {
+      const serviceIdRecord = serviceIdToElemID[returnValue]
+      if (serviceIdRecord !== undefined) {
+        returnValue = new ReferenceExpression(
+          serviceIdRecord.elemID,
+          serviceIdRecord.serviceID,
+        )
+      }
+    }
 
     return returnValue
   }
@@ -258,6 +272,39 @@ const createElementsSourceCustomRecordFieldsToElemID = async (
     : {}
 )
 
+const changeAnalyticsReferences = (
+  instance: InstanceElement,
+): void => {
+  const regex = /^\[scriptid=(.*)\]$/
+  const replaceReferenceAnalytics = (val: Value): Value => {
+    if (_.isString(val)) {
+      const match = val.match(regex)
+      if (match) {
+        return match[1]
+      }
+    }
+    return val
+  }
+  const deployWalkFunc: WalkOnFunc = ({ value }) => {
+    if (_.isPlainObject(value)) {
+      const keys = Object.keys(value)
+      keys.forEach(key => {
+        value[key] = replaceReferenceAnalytics(value[key])
+      })
+    } else if (Array.isArray(value)) {
+      value.forEach((_val, index) => {
+        value[index] = replaceReferenceAnalytics(value[index])
+      })
+    }
+    return WALK_NEXT_STEP.RECURSE
+  }
+
+  walkOnValue({
+    elemId: instance.elemID,
+    value: _.omit(instance.value, DEPENDENCIES, NAME),
+    func: deployWalkFunc,
+  })
+}
 const filterCreator: LocalFilterCreator = ({
   elementsSourceIndex,
   isPartial,
@@ -290,6 +337,11 @@ const filterCreator: LocalFilterCreator = ({
     }
     await awu(changes).map(getChangeData).forEach(async element => {
       const newElement = await resolveValues(element, getLookUpName)
+      if (
+        (newElement.elemID.typeName === DATASET || newElement.elemID.typeName === WORKBOOK)
+        && isInstanceElement(newElement)) {
+        changeAnalyticsReferences(newElement)
+      }
       applyValuesAndAnnotationsToElement(element, newElement)
     })
   },
