@@ -177,16 +177,17 @@ const deployChange = async (
  * modifications - changing the base field to the original value because Okta's API doesn't support changing it
  * removals - verifying the parent application is deleted. appUserSchema is deleted if and only if the parent application is deleted
  */
-const filterCreator: FilterCreator = ({ client, config }) => ({
+const filterCreator: FilterCreator = ({ definitions, oldApiDefinitions }) => ({
   name: 'appUserSchemaDeployment',
   deploy: async changes => {
+    const client = definitions.clients.options.main.httpClient
     const [relevantChanges, leftoverChanges] = _.partition(
       changes,
       change => getChangeData(change).elemID.typeName === APP_USER_SCHEMA_TYPE_NAME,
     )
 
     const deployResult = await deployChanges(relevantChanges.filter(isInstanceChange), async change =>
-      deployChange(change, client, config[API_DEFINITIONS_CONFIG]),
+      deployChange(change, client as OktaClient, oldApiDefinitions[API_DEFINITIONS_CONFIG]),
     )
 
     return {
